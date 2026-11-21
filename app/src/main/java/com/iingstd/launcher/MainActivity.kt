@@ -101,6 +101,7 @@ class MainActivity : Activity() {
     private var drawer = false
     private var drawerQuery = ""
     private var panel = false
+    private val extraEmptyHomePages = 5
     private var page = 0
     private var columns = 4
     private var lastBytes = -1L
@@ -370,7 +371,7 @@ class MainActivity : Activity() {
                     else if (dx > 0 && page > 0) page--
                     else if (dx > 0 && page == 0) { drawer = false; drawerQuery = "" }
                 } else {
-                    val max = ((favorites.size.coerceAtLeast(1) - 1) / (columns * 4))
+                    val max = ((favorites.size.coerceAtLeast(1) - 1) / (columns * 4)) + extraEmptyHomePages
                     if (dx < 0 && page < max) page++
                     else if (dx > 0 && page > 0) page--
                     else if (dx < 0 && page == max) { drawer = true; page = 0 }
@@ -1156,7 +1157,7 @@ class MainActivity : Activity() {
         area.addView(homeScroll, LinearLayout.LayoutParams(-1, 0, 1f))
         val perPage = columns * 4
         val homeItems = favorites.toList()
-        val maxPage = ((homeItems.size.coerceAtLeast(1) - 1) / perPage)
+        val maxPage = ((homeItems.size.coerceAtLeast(1) - 1) / perPage) + extraEmptyHomePages
         page = page.coerceIn(0, maxPage)
         val width = (resources.displayMetrics.widthPixels - dp(32)) / columns
         homeItems.drop(page * perPage).take(perPage).forEach { key ->
