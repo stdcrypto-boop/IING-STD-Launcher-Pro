@@ -4,6 +4,8 @@ import android.app.Activity
 import android.app.AlertDialog
 import android.content.*
 import android.graphics.Color
+import android.graphics.Canvas
+import android.graphics.Paint
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.net.ConnectivityManager
@@ -29,6 +31,8 @@ class MainActivity : Activity() {
     private lateinit var clock: TextView
     private lateinit var date: TextView
     private lateinit var network: TextView
+    private lateinit var signalBars: SignalBars
+    private var signalLevel = 0
     private lateinit var battery: TextView
     private lateinit var speed: TextView
     private lateinit var content: FrameLayout
@@ -65,6 +69,21 @@ class MainActivity : Activity() {
         setColor(color); cornerRadius = dp(radius).toFloat()
         if (outline) setStroke(dp(1), aqua)
     }
+    private inner class SignalBars(context: Context) : View(context) {
+        private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+        override fun onDraw(canvas: Canvas) {
+            super.onDraw(canvas)
+            val barWidth = dp(7).toFloat()
+            val gap = dp(4).toFloat()
+            val base = height - dp(4).toFloat()
+            for (i in 0..3) {
+                val h = dp(9 + i * 7).toFloat()
+                paint.color = if (i < signalLevel) aqua else 0xff315754.toInt()
+                val x = dp(2).toFloat() + i * (barWidth + gap)
+                canvas.drawRoundRect(x, base - h, x + barWidth, base, dp(3).toFloat(), dp(3).toFloat(), paint)
+            }
+        }
+    }
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         window.statusBarColor = 0xff061a1d.toInt()
@@ -82,8 +101,10 @@ class MainActivity : Activity() {
         }
         root.addView(brand, LinearLayout.LayoutParams(-1, dp(35)))
         val status = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL }
-        network = text("▂▄▆█  --", 17f, aqua)
-        status.addView(network, LinearLayout.LayoutParams(0, dp(38), 1f))
+        signalBars = SignalBars(this)
+        status.addView(signalBars, LinearLayout.LayoutParams(dp(48), dp(40)))
+        network = text("Memeriksa jaringan", 13f, aqua).apply { gravity = Gravity.START or Gravity.CENTER_VERTICAL }
+        status.addView(network, LinearLayout.LayoutParams(0, dp(40), 1f))
         speed = text("↓ -- KB/s", 12f, muted)
         status.addView(speed, LinearLayout.LayoutParams(0, dp(38), 1f))
         battery = text("BAT --", 16f, aqua)
@@ -295,11 +316,24 @@ class MainActivity : Activity() {
     private fun updateStatus() {
         val cm = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
         val cap = cm.getNetworkCapabilities(cm.activeNetwork)
+        val connected = cap != null
         network.text = when {
-            cap?.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) == true -> "▂▄▆█  Wi-Fi"
-            cap?.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) == true -> "▂▄▆█  Seluler"
-            else -> "▁▁▁▁  Offline"
+            cap?.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) == true -> "Wi-Fi"
+            cap?.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) == true -> "Seluler"
+            else -> "Offline"
         }
+        // Android may hide radio strength from ordinary apps. Do not invent a full signal.
+        val dbm = if (Build.VERSION.SDK_INT >= 29) cap?.signalStrength ?: Int.MIN_VALUE else Int.MIN_VALUE
+        signalLevel = when {
+            !connected -> 0
+            dbm == Int.MIN_VALUE -> 0
+            dbm >= -60 -> 4
+            dbm >= -75 -> 3
+            dbm >= -90 -> 2
+            else -> 1
+        }
+        signalBars.contentDescription = if (dbm == Int.MIN_VALUE) "Kekuatan sinyal tidak tersedia" else "Kekuatan sinyal $signalLevel dari 4"
+        signalBars.invalidate()
         val now = SystemClock.elapsedRealtime()
         val bytes = TrafficStats.getTotalRxBytes()
         if (lastAt > 0 && bytes >= lastBytes && bytes >= 0) {
