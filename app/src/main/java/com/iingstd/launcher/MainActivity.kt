@@ -19,6 +19,10 @@ import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.net.TrafficStats
 import android.telephony.TelephonyManager
+import android.telephony.PhoneStateListener
+import android.telephony.SignalStrength
+import android.telephony.TelephonyDisplayInfo
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.*
 import android.provider.Settings
@@ -43,6 +47,46 @@ class MainActivity : Activity() {
     private lateinit var network: TextView
     private lateinit var signalBars: SignalBars
     private var signalLevel = 0
+    private var cellularBarsAvailable = false
+    private var radioType = "Seluler"
+    private var telephonyListening = false
+    private val phoneListener = object : PhoneStateListener() {
+        override fun onSignalStrengthsChanged(strength: SignalStrength?) {
+            cellularBarsAvailable = strength != null
+            if (strength != null) signalLevel = strength.level.coerceIn(0, 4)
+            if (::signalBars.isInitialized) {
+                signalBars.alpha = if (cellularBarsAvailable) 1f else 0.28f
+                signalBars.invalidate()
+            }
+        }
+        override fun onDisplayInfoChanged(info: TelephonyDisplayInfo) {
+            radioType = when {
+                info.overrideNetworkType == TelephonyDisplayInfo.OVERRIDE_NETWORK_TYPE_NR_NSA || info.overrideNetworkType == TelephonyDisplayInfo.OVERRIDE_NETWORK_TYPE_NR_NSA_MMWAVE -> "5G"
+                info.networkType == TelephonyManager.NETWORK_TYPE_NR -> "5G"
+                info.networkType == TelephonyManager.NETWORK_TYPE_LTE -> "4G LTE"
+                info.networkType == TelephonyManager.NETWORK_TYPE_HSPAP || info.networkType == TelephonyManager.NETWORK_TYPE_UMTS -> "3G"
+                info.networkType == TelephonyManager.NETWORK_TYPE_EDGE || info.networkType == TelephonyManager.NETWORK_TYPE_GPRS -> "2G"
+                else -> "Seluler"
+            }
+            if (::network.isInitialized) updateStatus()
+        }
+    }
+    private fun startTelephony() {
+        if (telephonyListening || Build.VERSION.SDK_INT < 30) return
+        if (checkSelfPermission(android.Manifest.permission.READ_PHONE_STATE) != PackageManager.PERMISSION_GRANTED) return
+        try {
+            val tm = getSystemService(Context.TELEPHONY_SERVICE) as TelephonyManager
+            tm.listen(phoneListener, PhoneStateListener.LISTEN_SIGNAL_STRENGTHS or PhoneStateListener.LISTEN_DISPLAY_INFO_CHANGED)
+            telephonyListening = true
+        } catch (_: Exception) { cellularBarsAvailable = false }
+    }
+    private fun stopTelephony() {
+        if (!telephonyListening) return
+        try {
+            (getSystemService(Context.TELEPHONY_SERVICE) as TelephonyManager).listen(phoneListener, PhoneStateListener.LISTEN_NONE)
+        } catch (_: Exception) {}
+        telephonyListening = false
+    }
     private lateinit var battery: TextView
     private lateinit var speed: TextView
     private lateinit var content: FrameLayout
@@ -1029,19 +1073,7 @@ class MainActivity : Activity() {
         folders.clear(); folderNames.clear(); loadFolders()
         loadApps(); applyWallpaper(); page = 0; render()
     }
-    private fun cellularLabel(): String {
-        return try {
-            val tm = getSystemService(Context.TELEPHONY_SERVICE) as TelephonyManager
-            when (tm.dataNetworkType) {
-                TelephonyManager.NETWORK_TYPE_NR -> "5G"
-                TelephonyManager.NETWORK_TYPE_LTE -> "4G LTE"
-                TelephonyManager.NETWORK_TYPE_HSPAP, TelephonyManager.NETWORK_TYPE_UMTS -> "3G"
-                TelephonyManager.NETWORK_TYPE_EDGE, TelephonyManager.NETWORK_TYPE_GPRS -> "2G"
-                else -> "Seluler"
-            }
-        } catch (_: SecurityException) { "Seluler" }
-          catch (_: Exception) { "Seluler" }
-    }
+    private fun cellularLabel(): String = radioType
     private fun updateStatus() {
         val cm = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
         val cap = cm.getNetworkCapabilities(cm.activeNetwork)
@@ -1051,18 +1083,8 @@ class MainActivity : Activity() {
             cap?.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) == true -> cellularLabel()
             else -> "Offline"
         }
-        // Android may hide radio strength from ordinary apps. Do not invent a full signal.
-        val dbm = if (Build.VERSION.SDK_INT >= 29) cap?.signalStrength ?: Int.MIN_VALUE else Int.MIN_VALUE
-        signalLevel = when {
-            !connected -> 0
-            dbm == Int.MIN_VALUE -> 0
-            dbm >= -60 -> 4
-            dbm >= -75 -> 3
-            dbm >= -90 -> 2
-            else -> 1
-        }
-        signalBars.alpha = if (dbm == Int.MIN_VALUE) 0.28f else 1f
-        signalBars.contentDescription = if (dbm == Int.MIN_VALUE) "Kekuatan sinyal tidak tersedia" else "Kekuatan sinyal $signalLevel dari 4"
+        signalBars.alpha = if (cellularBarsAvailable) 1f else 0.28f
+        signalBars.contentDescription = if (cellularBarsAvailable) "Kekuatan sinyal seluler $signalLevel dari 4" else "Kekuatan sinyal seluler tidak tersedia"
         signalBars.invalidate()
         val now = SystemClock.elapsedRealtime()
         val bytes = TrafficStats.getTotalRxBytes()
@@ -1078,9 +1100,17 @@ class MainActivity : Activity() {
         super.onStart()
         val latestBattery = registerReceiver(receiver, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
         refreshBattery(latestBattery)
+        startTelephony()
+        if (Build.VERSION.SDK_INT >= 30 && checkSelfPermission(android.Manifest.permission.READ_PHONE_STATE) != PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(arrayOf(android.Manifest.permission.READ_PHONE_STATE), 717)
+        }
         if (::content.isInitialized) { loadApps(); render() }
     }
-    override fun onStop() { unregisterReceiver(receiver); super.onStop() }
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == 717 && grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED) startTelephony()
+    }
+    override fun onStop() { stopTelephony(); unregisterReceiver(receiver); super.onStop() }
     override fun onDestroy() { handler.removeCallbacks(tick); super.onDestroy() }
     @Deprecated("Deprecated in Java")
     override fun onBackPressed() {
