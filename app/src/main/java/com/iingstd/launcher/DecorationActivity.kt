@@ -32,8 +32,8 @@ class DecorationActivity : Activity() {
             gravity = Gravity.CENTER
         }, LinearLayout.LayoutParams(-1, dp(52)))
         layout.addView(TextView(this).apply {
-            text = "Foto dan tanda tangan menjadi bagian wallpaper beranda, di belakang ikon. Tidak menutupi aplikasi lain. Wallpaper lama akan diganti setelah kamu menekan Pasang."
-            setTextColor(0xffb9d5d0.toInt())
+            text = "Hati merah jambu dan tanda tangan menyatu dengan wallpaper beranda, di belakang ikon. Foto yang pernah dipilih tetap tersimpan. Wallpaper lama diganti hanya setelah menekan Pasang."
+            setTextColor(0xffffc5e1.toInt())
             textSize = 14f
         })
         preview = ImageView(this).apply { scaleType = ImageView.ScaleType.FIT_CENTER }
@@ -75,13 +75,13 @@ class DecorationActivity : Activity() {
         val canvas = Canvas(out)
         val p = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
         p.shader = LinearGradient(0f, 0f, w.toFloat(), h.toFloat(),
-            intArrayOf(0xff07191c.toInt(), 0xff174640.toInt(), 0xff10151e.toInt()), null, Shader.TileMode.CLAMP)
+            intArrayOf(0xff190d1c.toInt(), 0xff45203c.toInt(), 0xff170c20.toInt()), null, Shader.TileMode.CLAMP)
         canvas.drawRect(0f, 0f, w.toFloat(), h.toFloat(), p)
         p.shader = null
         val size = w * .39f
         val x = (w-size)/2f
         val y = h*.43f-size*.5f
-        photo?.let { bmp ->
+        run {\n            val bmp = photo
             val heart = Path().apply {
                 moveTo(x+size*.5f, y+size*.93f)
                 cubicTo(x-size*.12f, y+size*.47f, x+size*.05f, y+size*.05f, x+size*.28f, y+size*.08f)
@@ -95,10 +95,10 @@ class DecorationActivity : Activity() {
             val dw = bmp.width*scale; val dh = bmp.height*scale
             canvas.drawBitmap(bmp, null, RectF(x+(size-dw)/2, y+(size-dh)/2, x+(size+dw)/2, y+(size+dh)/2), p)
             canvas.restore()
-            p.style = Paint.Style.STROKE; p.strokeWidth = w*.005f; p.color = 0xff32e4c9.toInt()
+            p.style = Paint.Style.STROKE; p.strokeWidth = w*.012f; p.color = 0xffff80c0.toInt()
             canvas.drawPath(heart,p); p.style = Paint.Style.FILL
         }
-        p.color = 0xffd4e8df.toInt()
+        p.color = 0xffffc5e1.toInt()
         p.textAlign = Paint.Align.CENTER
         p.typeface = Typeface.create("cursive", Typeface.ITALIC)
         p.textSize = w*.087f
