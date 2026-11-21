@@ -66,6 +66,7 @@ class MainActivity : Activity() {
     private val hiddenApps = linkedSetOf<String>()
     private val favorites = linkedSetOf<String>()
     private val drawerOrder = mutableListOf<String>()
+    private val dockApps = mutableListOf<String>()
     private var favoritesInitialized = false
     private val folders = linkedMapOf<String, MutableList<String>>()
     private val folderNames = linkedMapOf<String, String>()
@@ -122,6 +123,7 @@ class MainActivity : Activity() {
         heartOpacity = getPreferences(MODE_PRIVATE).getInt("heart_opacity", 100).coerceIn(20, 100)
         hiddenApps.addAll(getPreferences(MODE_PRIVATE).getString("hidden_apps", "")?.split("|")?.filter { it.isNotBlank() } ?: emptyList())
         drawerOrder.addAll(getPreferences(MODE_PRIVATE).getString("drawer_order", "")?.split("|")?.filter { it.isNotBlank() } ?: emptyList())
+        dockApps.addAll(getPreferences(MODE_PRIVATE).getString("dock_apps", "")?.split("|")?.filter { it.isNotBlank() } ?: emptyList())
         loadSignaturePhoto()
         loadFolders()
         favoritesInitialized = getPreferences(MODE_PRIVATE).contains("favorites_order")
@@ -262,6 +264,14 @@ class MainActivity : Activity() {
             apps.filter { app -> listOf("camera", "chrome", "whatsapp", "setting", "phone", "message").any { app.name.contains(it, true) || app.pkg.contains(it, true) } }
                 .take(8).forEach { favorites.add(it.pkg) }
             saveFavorites()
+        }
+        if (dockApps.isEmpty() && !getPreferences(MODE_PRIVATE).contains("dock_apps")) {
+            listOf("dialer", "messag", "camera", "chrome").forEach { key ->
+                apps.firstOrNull { it.pkg.contains(key, true) || it.name.contains(key, true) }?.let { app ->
+                    if (app.pkg !in dockApps) dockApps.add(app.pkg)
+                }
+            }
+            saveDock()
         }
         if (::dockBar.isInitialized) buildDock(dockBar)
     }
@@ -559,7 +569,7 @@ class MainActivity : Activity() {
     }
     private fun appMenu(app: App) {
         AlertDialog.Builder(this).setTitle(app.name)
-            .setItems(arrayOf("Buka", if (favorites.contains(app.pkg)) "Hapus dari beranda" else "Tambahkan ke beranda", "Pindahkan ikon ke awal", "Info aplikasi", "Uninstall", "Buat / masukkan ke folder")) { _, option ->
+            .setItems(arrayOf("Buka", if (favorites.contains(app.pkg)) "Hapus dari beranda" else "Tambahkan ke beranda", "Pindahkan ikon ke awal", "Info aplikasi", "Uninstall", "Buat / masukkan ke folder", if (dockApps.contains(app.pkg)) "Hapus dari dock" else "Tambahkan ke dock")) { _, option ->
                 try {
                     when (option) {
                         0 -> startActivity(app.launch)
@@ -568,6 +578,10 @@ class MainActivity : Activity() {
                         3 -> startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${app.pkg}")))
                         4 -> startActivity(Intent(Intent.ACTION_DELETE, Uri.parse("package:${app.pkg}")))
                         5 -> chooseFolderFor(app)
+                        6 -> {
+                            if (dockApps.contains(app.pkg)) { dockApps.remove(app.pkg); saveDock(); buildDock(dockBar) }
+                            else addToDock(app.pkg)
+                        }
                     }
                 } catch (_: Exception) { Toast.makeText(this, "Tindakan tidak tersedia", Toast.LENGTH_SHORT).show() }
             }.show()
@@ -829,7 +843,7 @@ class MainActivity : Activity() {
         val prefs = getPreferences(MODE_PRIVATE)
         return JSONObject().apply {
             put("format", "iing-std-layout-v1")
-            listOf("favorites_order", "drawer_order", "folder_data", "hidden_apps").forEach {
+            listOf("favorites_order", "drawer_order", "folder_data", "hidden_apps", "dock_apps").forEach {
                 put(it, prefs.getString(it, if (it == "folder_data") "{}" else "") ?: "")
             }
             put("columns", columns)
@@ -855,7 +869,7 @@ class MainActivity : Activity() {
     private fun restoreLayout(data: JSONObject) {
         if (data.optString("format") != "iing-std-layout-v1") throw IllegalArgumentException("Format tidak cocok")
         val prefs = getPreferences(MODE_PRIVATE).edit()
-        listOf("favorites_order", "drawer_order", "folder_data", "hidden_apps").forEach {
+        listOf("favorites_order", "drawer_order", "folder_data", "hidden_apps", "dock_apps").forEach {
             prefs.putString(it, data.optString(it, if (it == "folder_data") "{}" else ""))
         }
         columns = data.optInt("columns", 4).coerceIn(4, 6)
@@ -873,6 +887,8 @@ class MainActivity : Activity() {
         data.optString("drawer_order").split("|").filter { it.isNotBlank() }.forEach { drawerOrder.add(it) }
         hiddenApps.clear()
         data.optString("hidden_apps").split("|").filter { it.isNotBlank() }.forEach { hiddenApps.add(it) }
+        dockApps.clear()
+        data.optString("dock_apps").split("|").filter { it.isNotBlank() }.take(4).forEach { dockApps.add(it) }
         folders.clear(); folderNames.clear(); loadFolders()
         loadApps(); applyWallpaper(); page = 0; render()
     }
