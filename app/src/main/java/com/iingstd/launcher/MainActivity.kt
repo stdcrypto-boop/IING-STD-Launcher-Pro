@@ -40,6 +40,7 @@ class MainActivity : Activity() {
     private lateinit var speed: TextView
     private lateinit var content: FrameLayout
     private var drawer = false
+    private var drawerQuery = ""
     private var panel = false
     private var page = 0
     private var columns = 4
@@ -162,9 +163,23 @@ class MainActivity : Activity() {
         if (ev.actionMasked == MotionEvent.ACTION_UP && !panel) {
             val dx = ev.rawX - gestureX
             val dy = ev.rawY - gestureY
-            if (!drawer && kotlin.math.abs(dx) > dp(90) && kotlin.math.abs(dx) > kotlin.math.abs(dy) * 1.4f) {
-                val maxPage = ((favorites.size.coerceAtLeast(1) - 1) / (columns * 4))
-                page = (page + if (dx < 0) 1 else -1).coerceIn(0, maxPage)
+            // Only the workspace handles paging gestures; keep the system bars and dock untouched.
+            val location = IntArray(2)
+            content.getLocationOnScreen(location)
+            val inWorkspace = gestureY >= location[1] && gestureY <= location[1] + content.height
+            if (inWorkspace && kotlin.math.abs(dx) > dp(65) && kotlin.math.abs(dx) > kotlin.math.abs(dy) * 1.3f) {
+                if (drawer) {
+                    val matches = apps.count { it.name.contains(drawerQuery, true) }
+                    val max = ((matches.coerceAtLeast(1) - 1) / (columns * 5))
+                    if (dx < 0 && page < max) page++
+                    else if (dx > 0 && page > 0) page--
+                    else if (dx > 0 && page == 0) { drawer = false; drawerQuery = "" }
+                } else {
+                    val max = ((favorites.size.coerceAtLeast(1) - 1) / (columns * 4))
+                    if (dx < 0 && page < max) page++
+                    else if (dx > 0 && page > 0) page--
+                    else if (dx < 0 && page == max) { drawer = true; page = 0 }
+                }
                 render()
                 return true
             }
@@ -343,6 +358,8 @@ class MainActivity : Activity() {
         val search = EditText(this).apply {
             hint = "Cari aplikasi"; setSingleLine(true); textSize = 16f
             setTextColor(Color.WHITE); setHintTextColor(muted)
+            setText(drawerQuery)
+            setSelection(text.length)
         }
         area.addView(search, LinearLayout.LayoutParams(-1, dp(52)))
         val pager = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL }
@@ -373,10 +390,12 @@ class MainActivity : Activity() {
         layout.setOnClickListener { columns = if (columns == 4) 5 else if (columns == 5) 6 else 4; grid.columnCount = columns; page = 0; redraw() }
         search.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
-            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) { page = 0; redraw() }
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) { drawerQuery = s?.toString() ?: ""; page = 0; redraw() }
             override fun afterTextChanged(s: Editable?) {}
         })
-        scroll.setOnTouchListener(object : View.OnTouchListener {
+        /* Horizontal paging is handled at Activity dispatch level, including over app icons.
+           Do not attach a second competing touch listener to the scroll container. */
+        /* scroll.setOnTouchListener(object : View.OnTouchListener {
             override fun onTouch(v: View, e: MotionEvent): Boolean {
                 if (e.action == MotionEvent.ACTION_DOWN) { startX = e.x; return false }
                 if (e.action == MotionEvent.ACTION_UP && kotlin.math.abs(e.x - startX) > dp(60)) {
@@ -386,6 +405,7 @@ class MainActivity : Activity() {
                 return false
             }
         })
+        */
         redraw()
     }
     private fun renderPanel() {
