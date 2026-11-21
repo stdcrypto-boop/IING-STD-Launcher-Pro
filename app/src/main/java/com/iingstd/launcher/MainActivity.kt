@@ -79,15 +79,34 @@ class MainActivity : Activity() {
                 clock.text = SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date())
                 date.text = SimpleDateFormat("EEEE, dd MMM yyyy", Locale.getDefault()).format(Date())
                 updateStatus()
+                refreshBattery(registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED)))
             }
             handler.postDelayed(this, 1000)
         }
     }
+    private fun refreshBattery(intent: Intent?) {
+        val level = intent?.getIntExtra(BatteryManager.EXTRA_LEVEL, -1) ?: -1
+        val scale = intent?.getIntExtra(BatteryManager.EXTRA_SCALE, 100) ?: 100
+        val status = intent?.getIntExtra(BatteryManager.EXTRA_STATUS, -1) ?: -1
+        val percent = if (level >= 0 && scale > 0) level * 100 / scale else -1
+        val indicator = when (status) {
+            BatteryManager.BATTERY_STATUS_CHARGING -> "⚡"
+            BatteryManager.BATTERY_STATUS_FULL -> "✓"
+            else -> "▰"
+        }
+        if (::battery.isInitialized) {
+            val label = if (percent >= 0) "$indicator $percent%" else "$indicator --"
+            if (battery.text.toString() != label) battery.text = label
+            battery.contentDescription = when (status) {
+                BatteryManager.BATTERY_STATUS_CHARGING -> "Baterai $percent persen, sedang mengisi"
+                BatteryManager.BATTERY_STATUS_FULL -> "Baterai penuh"
+                else -> "Baterai $percent persen"
+            }
+        }
+    }
     private val receiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
-            val level = intent?.getIntExtra(BatteryManager.EXTRA_LEVEL, -1) ?: -1
-            val scale = intent?.getIntExtra(BatteryManager.EXTRA_SCALE, 100) ?: 100
-            if (::battery.isInitialized) battery.text = if (level >= 0 && scale > 0) "💡 ${level * 100 / scale}%" else "💡 --"
+            refreshBattery(intent)
         }
     }
     private fun dp(n: Int) = (n * resources.displayMetrics.density + .5f).toInt()
@@ -1044,7 +1063,8 @@ class MainActivity : Activity() {
     }
     override fun onStart() {
         super.onStart()
-        registerReceiver(receiver, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
+        val latestBattery = registerReceiver(receiver, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
+        refreshBattery(latestBattery)
         if (::content.isInitialized) { loadApps(); render() }
     }
     override fun onStop() { unregisterReceiver(receiver); super.onStop() }
