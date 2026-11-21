@@ -482,6 +482,28 @@ class MainActivity : Activity() {
     @Deprecated("Deprecated in Java")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
+        if (resultCode == RESULT_OK && (requestCode == 613 || requestCode == 614)) {
+            val uri = data?.data ?: return
+            try {
+                if (requestCode == 613) {
+                    contentResolver.openOutputStream(uri)?.bufferedWriter()?.use { it.write(layoutJson().toString(2)) }
+                    Toast.makeText(this, "Backup tersimpan", Toast.LENGTH_SHORT).show()
+                } else {
+                    val raw = contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() } ?: return
+                    val json = JSONObject(raw)
+                    if (json.optString("format") != "iing-std-layout-v1") throw IllegalArgumentException("Format tidak cocok")
+                    AlertDialog.Builder(this).setTitle("Pulihkan tata letak?")
+                        .setMessage("Susunan ikon, folder, dan pengaturan akan diganti. Foto asli tidak dihapus.")
+                        .setPositiveButton("Pulihkan") { _, _ ->
+                            try { restoreLayout(json) }
+                            catch (_: Exception) { Toast.makeText(this, "Backup tidak valid", Toast.LENGTH_SHORT).show() }
+                        }.setNegativeButton("Batal", null).show()
+                }
+            } catch (_: Exception) {
+                Toast.makeText(this, "Gagal membaca atau menulis backup", Toast.LENGTH_SHORT).show()
+            }
+            return
+        }
         if (requestCode == 612 && resultCode == RESULT_OK) {
             val uri = data?.data ?: return
             try {
