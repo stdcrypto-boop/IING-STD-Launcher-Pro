@@ -571,6 +571,23 @@ class MainActivity : Activity() {
                     }.setNegativeButton("Batal", null).show()
             }.setNegativeButton("Tutup", null).show()
     }
+    private fun addSoftPress(view: View) {
+        view.setOnTouchListener { v, event ->
+            when (event.actionMasked) {
+                MotionEvent.ACTION_DOWN -> {
+                    v.animate().cancel()
+                    v.animate().scaleX(0.94f).scaleY(0.94f).setDuration(140L)
+                        .setInterpolator(PathInterpolator(0.22f, 1f, 0.36f, 1f)).start()
+                }
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                    v.animate().cancel()
+                    v.animate().scaleX(1f).scaleY(1f).setDuration(260L)
+                        .setInterpolator(PathInterpolator(0.22f, 1f, 0.36f, 1f)).start()
+                }
+            }
+            false
+        }
+    }
     private fun iconCell(app: App, width: Int, height: Int): LinearLayout {
         val cell = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL; gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
@@ -616,6 +633,7 @@ class MainActivity : Activity() {
                 else -> true
             }
         }
+        addSoftPress(cell)
         cell.layoutParams = GridLayout.LayoutParams().apply { this.width = width; this.height = height }
         return cell
     }
@@ -1024,6 +1042,7 @@ class MainActivity : Activity() {
                     true
                 }
             }
+            addSoftPress(image)
             image.background = GradientDrawable().apply {
                 setColor(0x16D4AF37)
                 cornerRadius = dp(dockIconSize / 2).toFloat()
