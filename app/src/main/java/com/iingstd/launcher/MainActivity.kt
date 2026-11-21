@@ -14,6 +14,7 @@ import android.graphics.drawable.GradientDrawable
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.net.TrafficStats
+import android.telephony.TelephonyManager
 import android.net.Uri
 import android.os.*
 import android.provider.Settings
@@ -45,6 +46,7 @@ class MainActivity : Activity() {
     private var page = 0
     private var columns = 4
     private var lastBytes = -1L
+    private var lastTxBytes = -1L
     private var lastAt = 0L
     private var startX = 0f
     private var startY = 0f
@@ -68,7 +70,7 @@ class MainActivity : Activity() {
         override fun onReceive(context: Context?, intent: Intent?) {
             val level = intent?.getIntExtra(BatteryManager.EXTRA_LEVEL, -1) ?: -1
             val scale = intent?.getIntExtra(BatteryManager.EXTRA_SCALE, 100) ?: 100
-            if (::battery.isInitialized) battery.text = if (level >= 0 && scale > 0) "▰ ${level * 100 / scale}%" else "BAT --"
+            if (::battery.isInitialized) battery.text = if (level >= 0 && scale > 0) "💡 ${level * 100 / scale}%" else "💡 --"
         }
     }
     private fun dp(n: Int) = (n * resources.displayMetrics.density + .5f).toInt()
@@ -255,7 +257,32 @@ class MainActivity : Activity() {
             maxLines = 2; ellipsize = android.text.TextUtils.TruncateAt.END
         }, LinearLayout.LayoutParams(-1, dp(39)).apply { topMargin = dp(5) })
         cell.setOnClickListener { try { startActivity(app.launch) } catch (_: Exception) { Toast.makeText(this, "Tidak dapat membuka ${app.name}", Toast.LENGTH_SHORT).show() } }
-        cell.setOnLongClickListener { appMenu(app); true }
+        cell.setOnLongClickListener {
+            if (!drawer && !panel) {
+                val data = ClipData.newPlainText("launcher-app", app.pkg)
+                cell.startDragAndDrop(data, View.DragShadowBuilder(cell), app.pkg, 0)
+                true
+            } else { appMenu(app); true }
+        }
+        if (!drawer && !panel) cell.setOnDragListener { _, event ->
+            when (event.action) {
+                DragEvent.ACTION_DRAG_STARTED -> event.clipDescription?.hasMimeType("text/plain") == true
+                DragEvent.ACTION_DRAG_ENTERED -> { cell.alpha = 0.5f; true }
+                DragEvent.ACTION_DRAG_EXITED, DragEvent.ACTION_DRAG_ENDED -> { cell.alpha = 1f; true }
+                DragEvent.ACTION_DROP -> {
+                    cell.alpha = 1f
+                    val source = event.localState as? String
+                    if (source != null && source != app.pkg && favorites.contains(source)) {
+                        val order = favorites.toMutableList()
+                        order.remove(source)
+                        order.add(order.indexOf(app.pkg).coerceAtLeast(0), source)
+                        favorites.clear(); favorites.addAll(order); saveFavorites(); render()
+                    }
+                    true
+                }
+                else -> true
+            }
+        }
         cell.layoutParams = GridLayout.LayoutParams().apply { this.width = width; this.height = height }
         return cell
     }
@@ -453,13 +480,26 @@ class MainActivity : Activity() {
         area.addView(text("Panel ini membuka pengaturan Android; tidak mengganti Quick Settings sistem.", 12f, muted),
             LinearLayout.LayoutParams(-1, dp(70)))
     }
+    private fun cellularLabel(): String {
+        return try {
+            val tm = getSystemService(Context.TELEPHONY_SERVICE) as TelephonyManager
+            when (tm.dataNetworkType) {
+                TelephonyManager.NETWORK_TYPE_NR -> "5G"
+                TelephonyManager.NETWORK_TYPE_LTE -> "4G LTE"
+                TelephonyManager.NETWORK_TYPE_HSPAP, TelephonyManager.NETWORK_TYPE_UMTS -> "3G"
+                TelephonyManager.NETWORK_TYPE_EDGE, TelephonyManager.NETWORK_TYPE_GPRS -> "2G"
+                else -> "Seluler"
+            }
+        } catch (_: SecurityException) { "Seluler" }
+          catch (_: Exception) { "Seluler" }
+    }
     private fun updateStatus() {
         val cm = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
         val cap = cm.getNetworkCapabilities(cm.activeNetwork)
         val connected = cap != null
         network.text = when {
             cap?.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) == true -> "Wi-Fi"
-            cap?.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) == true -> "Seluler"
+            cap?.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) == true -> cellularLabel()
             else -> "Offline"
         }
         // Android may hide radio strength from ordinary apps. Do not invent a full signal.
@@ -476,11 +516,13 @@ class MainActivity : Activity() {
         signalBars.invalidate()
         val now = SystemClock.elapsedRealtime()
         val bytes = TrafficStats.getTotalRxBytes()
+        val txBytes = TrafficStats.getTotalTxBytes()
         if (lastAt > 0 && bytes >= lastBytes && bytes >= 0) {
             val rate = (bytes - lastBytes) * 1000 / (now - lastAt).coerceAtLeast(1)
-            speed.text = if (rate > 1048576) "↓ %.1f MB/s".format(Locale.US, rate / 1048576.0) else "↓ ${rate / 1024} KB/s"
+            val up = if (lastTxBytes >= 0 && txBytes >= lastTxBytes) (txBytes - lastTxBytes) * 1000 / (now - lastAt).coerceAtLeast(1) else 0L
+            speed.text = "↓ ${rate / 1024}K  ↑ ${up / 1024}K"
         }
-        lastBytes = bytes; lastAt = now
+        lastBytes = bytes; lastTxBytes = txBytes; lastAt = now
     }
     override fun onStart() {
         super.onStart()
