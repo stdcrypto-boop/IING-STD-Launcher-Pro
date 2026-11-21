@@ -79,7 +79,7 @@ class MainActivity : Activity() {
         if (checkSelfPermission(android.Manifest.permission.READ_PHONE_STATE) != PackageManager.PERMISSION_GRANTED) return
         try {
             val tm = getSystemService(Context.TELEPHONY_SERVICE) as TelephonyManager
-            val flags = PhoneStateListener.LISTEN_SIGNAL_STRENGTHS or if (Build.VERSION.SDK_INT >= 30) PhoneStateListener.LISTEN_DISPLAY_INFO_CHANGED else 0
+            val flags = PhoneStateListener.LISTEN_SIGNAL_STRENGTHS or (if (Build.VERSION.SDK_INT >= 30) PhoneStateListener.LISTEN_DISPLAY_INFO_CHANGED else 0)
             tm.listen(phoneListener, flags)
             telephonyListening = true
         } catch (_: Exception) { cellularBarsAvailable = false }
@@ -1110,7 +1110,8 @@ class MainActivity : Activity() {
         val latestBattery = registerReceiver(receiver, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
         refreshBattery(latestBattery)
         startTelephony()
-        if (Build.VERSION.SDK_INT >= 30 && checkSelfPermission(android.Manifest.permission.READ_PHONE_STATE) != PackageManager.PERMISSION_GRANTED) {
+        if (checkSelfPermission(android.Manifest.permission.READ_PHONE_STATE) != PackageManager.PERMISSION_GRANTED && !getPreferences(MODE_PRIVATE).getBoolean("phone_permission_asked", false)) {
+            getPreferences(MODE_PRIVATE).edit().putBoolean("phone_permission_asked", true).apply()
             requestPermissions(arrayOf(android.Manifest.permission.READ_PHONE_STATE), 717)
         }
         if (::content.isInitialized) { loadApps(); render() }
