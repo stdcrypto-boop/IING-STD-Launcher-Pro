@@ -375,7 +375,7 @@ class MainActivity : Activity() {
         labelRow.addView(text(app.name, 11f).apply {
             maxLines = 2; ellipsize = android.text.TextUtils.TruncateAt.END
         }, FrameLayout.LayoutParams(-1, -1))
-        if (drawer) {
+        {
             val options = text("⋮", 17f, aqua).apply {
                 contentDescription = "Opsi untuk ${app.name}"
                 isClickable = true
