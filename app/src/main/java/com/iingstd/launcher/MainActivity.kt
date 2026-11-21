@@ -120,7 +120,7 @@ class MainActivity : Activity() {
         getPreferences(MODE_PRIVATE).getString("favorites_order", "")?.split("|")?.filter { it.isNotBlank() }?.forEach { favorites.add(it) }
         root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(dp(16), dp(8), dp(16), dp(12))
+            setPadding(dp(16), dp(8), dp(16), dp(50))
             background = GradientDrawable(GradientDrawable.Orientation.TL_BR,
                 intArrayOf(0xff061719.toInt(), 0xff104441.toInt(), 0xff082126.toInt()))
         }
@@ -508,6 +508,27 @@ class MainActivity : Activity() {
         favoritesInitialized = true
         getPreferences(MODE_PRIVATE).edit().putString("favorites_order", favorites.joinToString("|")).apply()
     }
+    private fun showAddToHomePicker() {
+        val available = apps.filter { !favorites.contains(it.pkg) && folders.values.none { members -> it.pkg in members } }
+        if (available.isEmpty()) {
+            Toast.makeText(this, "Semua aplikasi sudah ada di beranda atau folder", Toast.LENGTH_SHORT).show()
+            return
+        }
+        val selected = BooleanArray(available.size)
+        AlertDialog.Builder(this)
+            .setTitle("Pilih aplikasi untuk beranda")
+            .setMultiChoiceItems(available.map { it.name }.toTypedArray(), selected) { _, index, checked ->
+                selected[index] = checked
+            }
+            .setPositiveButton("Tambahkan") { _, _ ->
+                available.forEachIndexed { index, app -> if (selected[index]) favorites.add(app.pkg) }
+                saveFavorites()
+                Toast.makeText(this, "Aplikasi ditambahkan ke beranda", Toast.LENGTH_SHORT).show()
+                render()
+            }
+            .setNegativeButton("Batal", null)
+            .show()
+    }
     private fun appMenu(app: App) {
         AlertDialog.Builder(this).setTitle(app.name)
             .setItems(arrayOf("Buka", if (favorites.contains(app.pkg)) "Hapus dari beranda" else "Tambahkan ke beranda", "Pindahkan ikon ke awal", "Info aplikasi", "Uninstall")) { _, option ->
@@ -595,6 +616,11 @@ class MainActivity : Activity() {
             setSelection(text.length)
         }
         area.addView(search, LinearLayout.LayoutParams(-1, dp(52)))
+        val addToHome = text("＋ TAMBAH APLIKASI KE BERANDA", 13f, aqua).apply {
+            background = shape(0xff124441.toInt(), 14, true)
+            setOnClickListener { showAddToHomePicker() }
+        }
+        area.addView(addToHome, LinearLayout.LayoutParams(-1, dp(44)))
         val pager = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL }
         val prev = text("‹", 30f, aqua)
         pager.addView(prev, LinearLayout.LayoutParams(dp(50), dp(43)))
