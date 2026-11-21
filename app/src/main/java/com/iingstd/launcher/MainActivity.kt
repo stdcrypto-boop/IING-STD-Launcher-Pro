@@ -301,7 +301,7 @@ class MainActivity : Activity() {
         folders[id].orEmpty().take(4).forEach { pkg ->
             apps.firstOrNull { it.pkg == pkg }?.let { app ->
                 mini.addView(ImageView(this).apply { setImageDrawable(app.icon) },
-                    GridLayout.LayoutParams().apply { width = dp(23); height = dp(23) })
+                    GridLayout.LayoutParams().apply { this.width = dp(23); this.height = dp(23) })
             }
         }
         preview.addView(mini, FrameLayout.LayoutParams(dp(46), dp(46), Gravity.CENTER))
