@@ -63,6 +63,8 @@ class MainActivity : Activity() {
     private var iconSize = 48
     private var heartSize = 112
     private var heartOpacity = 100
+    private var twoFingerPanel = true
+    private var touchPointerCount = 0
     private val hiddenApps = linkedSetOf<String>()
     private val favorites = linkedSetOf<String>()
     private val drawerOrder = mutableListOf<String>()
@@ -121,6 +123,7 @@ class MainActivity : Activity() {
         iconSize = getPreferences(MODE_PRIVATE).getInt("icon_size", 48).coerceIn(36, 64)
         heartSize = getPreferences(MODE_PRIVATE).getInt("heart_size", 112).coerceIn(72, 168)
         heartOpacity = getPreferences(MODE_PRIVATE).getInt("heart_opacity", 100).coerceIn(20, 100)
+        twoFingerPanel = getPreferences(MODE_PRIVATE).getBoolean("two_finger_panel", true)
         hiddenApps.addAll(getPreferences(MODE_PRIVATE).getString("hidden_apps", "")?.split("|")?.filter { it.isNotBlank() } ?: emptyList())
         drawerOrder.addAll(getPreferences(MODE_PRIVATE).getString("drawer_order", "")?.split("|")?.filter { it.isNotBlank() } ?: emptyList())
         dockApps.addAll(getPreferences(MODE_PRIVATE).getString("dock_apps", "")?.split("|")?.filter { it.isNotBlank() } ?: emptyList())
@@ -182,10 +185,15 @@ class MainActivity : Activity() {
     }
     override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
         if (ev.actionMasked == MotionEvent.ACTION_DOWN) {
+            touchPointerCount = 1
             gestureX = ev.rawX
             gestureY = ev.rawY
         }
-        if (ev.actionMasked == MotionEvent.ACTION_UP && !panel) {
+        if (ev.actionMasked == MotionEvent.ACTION_POINTER_DOWN) touchPointerCount = maxOf(touchPointerCount, ev.pointerCount)
+        if (ev.actionMasked == MotionEvent.ACTION_UP && touchPointerCount >= 2 && twoFingerPanel && ev.rawY - gestureY > dp(110)) {
+            panel = true; render(); touchPointerCount = 0; return true
+        }
+        if (ev.actionMasked == MotionEvent.ACTION_UP && touchPointerCount < 2 && !panel) {
             val dx = ev.rawX - gestureX
             val dy = ev.rawY - gestureY
             // Only the workspace handles paging gestures; keep the system bars and dock untouched.
@@ -215,6 +223,7 @@ class MainActivity : Activity() {
                 drawer = false; page = 0; render(); return true
             }
         }
+        if (ev.actionMasked == MotionEvent.ACTION_UP || ev.actionMasked == MotionEvent.ACTION_CANCEL) touchPointerCount = 0
         return super.dispatchTouchEvent(ev)
     }
     private fun applyWallpaper() {
@@ -870,6 +879,11 @@ class MainActivity : Activity() {
                     dialog.dismiss(); render()
                 }.setNegativeButton("Batal", null).show()
         }
+        option("GESTUR DUA JARI TURUN  •  " + if (twoFingerPanel) "AKTIF" else "NONAKTIF") {
+            twoFingerPanel = !twoFingerPanel
+            getPreferences(MODE_PRIVATE).edit().putBoolean("two_finger_panel", twoFingerPanel).apply()
+            render()
+        }
         option("BACKUP TATA LETAK  •  EKSPOR") { exportLayout() }
         option("PULIHKAN TATA LETAK  •  IMPOR") { importLayout() }
         val defaultSetting = text("JADIKAN LAUNCHER UTAMA  ⌂", 15f, aqua).apply {
@@ -904,6 +918,7 @@ class MainActivity : Activity() {
             put("heart_size", heartSize)
             put("heart_opacity", heartOpacity)
             put("wallpaper", showWallpaper)
+            put("two_finger_panel", twoFingerPanel)
         }
     }
     private fun exportLayout() {
@@ -930,9 +945,10 @@ class MainActivity : Activity() {
         heartSize = data.optInt("heart_size", 112).coerceIn(72, 168)
         heartOpacity = data.optInt("heart_opacity", 100).coerceIn(20, 100)
         showWallpaper = data.optBoolean("wallpaper", true)
+        twoFingerPanel = data.optBoolean("two_finger_panel", true)
         prefs.putInt("columns", columns).putInt("icon_size", iconSize)
             .putInt("heart_size", heartSize).putInt("heart_opacity", heartOpacity)
-            .putBoolean("wallpaper", showWallpaper).apply()
+            .putBoolean("wallpaper", showWallpaper).putBoolean("two_finger_panel", twoFingerPanel).apply()
         favorites.clear()
         data.optString("favorites_order").split("|").filter { it.isNotBlank() }.forEach { favorites.add(it) }
         favoritesInitialized = true
