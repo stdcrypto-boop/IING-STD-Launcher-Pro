@@ -50,16 +50,19 @@ class MainActivity : Activity() {
     private var cellularBarsAvailable = false
     private var radioType = "Seluler"
     private var telephonyListening = false
+    private var cellularServiceAvailable = false
     private val phoneListener = object : PhoneStateListener() {
         override fun onSignalStrengthsChanged(strength: SignalStrength?) {
             cellularBarsAvailable = strength != null
             if (strength != null) signalLevel = strength.level.coerceIn(0, 4)
+            if (::network.isInitialized) updateStatus()
             if (::signalBars.isInitialized) {
                 signalBars.alpha = if (cellularBarsAvailable) 1f else 0.28f
                 signalBars.invalidate()
             }
         }
         override fun onDisplayInfoChanged(info: TelephonyDisplayInfo) {
+            cellularServiceAvailable = info.networkType != TelephonyManager.NETWORK_TYPE_UNKNOWN
             radioType = when {
                 info.overrideNetworkType == TelephonyDisplayInfo.OVERRIDE_NETWORK_TYPE_NR_NSA || info.overrideNetworkType == TelephonyDisplayInfo.OVERRIDE_NETWORK_TYPE_NR_NSA_MMWAVE -> "5G"
                 info.networkType == TelephonyManager.NETWORK_TYPE_NR -> "5G"
@@ -72,11 +75,12 @@ class MainActivity : Activity() {
         }
     }
     private fun startTelephony() {
-        if (telephonyListening || Build.VERSION.SDK_INT < 30) return
+        if (telephonyListening) return
         if (checkSelfPermission(android.Manifest.permission.READ_PHONE_STATE) != PackageManager.PERMISSION_GRANTED) return
         try {
             val tm = getSystemService(Context.TELEPHONY_SERVICE) as TelephonyManager
-            tm.listen(phoneListener, PhoneStateListener.LISTEN_SIGNAL_STRENGTHS or PhoneStateListener.LISTEN_DISPLAY_INFO_CHANGED)
+            val flags = PhoneStateListener.LISTEN_SIGNAL_STRENGTHS or if (Build.VERSION.SDK_INT >= 30) PhoneStateListener.LISTEN_DISPLAY_INFO_CHANGED else 0
+            tm.listen(phoneListener, flags)
             telephonyListening = true
         } catch (_: Exception) { cellularBarsAvailable = false }
     }
@@ -86,6 +90,7 @@ class MainActivity : Activity() {
             (getSystemService(Context.TELEPHONY_SERVICE) as TelephonyManager).listen(phoneListener, PhoneStateListener.LISTEN_NONE)
         } catch (_: Exception) {}
         telephonyListening = false
+        cellularBarsAvailable = false
     }
     private lateinit var battery: TextView
     private lateinit var speed: TextView
@@ -1078,11 +1083,15 @@ class MainActivity : Activity() {
         val cm = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
         val cap = cm.getNetworkCapabilities(cm.activeNetwork)
         val connected = cap != null
-        network.text = when {
+        val internet = when {
             cap?.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) == true -> "Wi-Fi"
-            cap?.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) == true -> cellularLabel()
-            else -> "Offline"
+            cap?.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) == true -> "Data seluler"
+            cap == null -> "Offline"
+            else -> "Internet"
         }
+        val mobile = if (cellularServiceAvailable || radioType != "Seluler") radioType else "Seluler"
+        val statusLabel = "$mobile • $internet"
+        if (network.text.toString() != statusLabel) network.text = statusLabel
         signalBars.alpha = if (cellularBarsAvailable) 1f else 0.28f
         signalBars.contentDescription = if (cellularBarsAvailable) "Kekuatan sinyal seluler $signalLevel dari 4" else "Kekuatan sinyal seluler tidak tersedia"
         signalBars.invalidate()
