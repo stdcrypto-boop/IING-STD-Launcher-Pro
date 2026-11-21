@@ -383,14 +383,12 @@ class MainActivity : Activity() {
         labelRow.addView(text(app.name, 11f).apply {
             maxLines = 2; ellipsize = android.text.TextUtils.TruncateAt.END
         }, FrameLayout.LayoutParams(-1, -1))
-        {
-            val options = text("⋮", 17f, aqua).apply {
+        val options = text("⋮", 17f, aqua).apply {
                 contentDescription = "Opsi untuk ${app.name}"
                 isClickable = true
                 setOnClickListener { appMenu(app) }
             }
-            labelRow.addView(options, FrameLayout.LayoutParams(dp(26), dp(39), Gravity.END or Gravity.TOP))
-        }
+        labelRow.addView(options, FrameLayout.LayoutParams(dp(26), dp(39), Gravity.END or Gravity.TOP))
         cell.addView(labelRow, LinearLayout.LayoutParams(-1, dp(39)).apply { topMargin = dp(5) })
         cell.setOnClickListener { try { startActivity(app.launch) } catch (_: Exception) { Toast.makeText(this, "Tidak dapat membuka ${app.name}", Toast.LENGTH_SHORT).show() } }
         cell.setOnLongClickListener {
