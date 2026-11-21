@@ -69,6 +69,7 @@ class MainActivity : Activity() {
     private val favorites = linkedSetOf<String>()
     private val drawerOrder = mutableListOf<String>()
     private val dockApps = mutableListOf<String>()
+    private var dockCapacity = 4
     private var favoritesInitialized = false
     private val folders = linkedMapOf<String, MutableList<String>>()
     private val folderNames = linkedMapOf<String, String>()
@@ -146,6 +147,7 @@ class MainActivity : Activity() {
         hiddenApps.addAll(getPreferences(MODE_PRIVATE).getString("hidden_apps", "")?.split("|")?.filter { it.isNotBlank() } ?: emptyList())
         drawerOrder.addAll(getPreferences(MODE_PRIVATE).getString("drawer_order", "")?.split("|")?.filter { it.isNotBlank() } ?: emptyList())
         dockApps.addAll(getPreferences(MODE_PRIVATE).getString("dock_apps", "")?.split("|")?.filter { it.isNotBlank() } ?: emptyList())
+        dockCapacity = getPreferences(MODE_PRIVATE).getInt("dock_capacity", 4).coerceIn(4, 6)
         loadSignaturePhoto()
         loadFolders()
         favoritesInitialized = getPreferences(MODE_PRIVATE).contains("favorites_order")
@@ -665,7 +667,7 @@ class MainActivity : Activity() {
     }
     private fun addToDock(pkg: String) {
         if (pkg in dockApps) return
-        if (dockApps.size >= 4) {
+        if (dockApps.size >= dockCapacity) {
             AlertDialog.Builder(this).setTitle("Ganti aplikasi di dock")
                 .setItems(dockApps.map { id -> apps.firstOrNull { it.pkg == id }?.name ?: id }.toTypedArray()) { _, index ->
                     dockApps[index] = pkg
@@ -710,7 +712,7 @@ class MainActivity : Activity() {
                 else -> true
             }
         }
-        dockApps.take(4).forEach { pkg ->
+        dockApps.take(dockCapacity).forEach { pkg ->
             val app = apps.firstOrNull { it.pkg == pkg }
             val image = ImageView(this)
             if (app != null) {
@@ -740,7 +742,7 @@ class MainActivity : Activity() {
             slot.addView(image, FrameLayout.LayoutParams(dp(58), dp(58), Gravity.CENTER))
             dock.addView(slot, LinearLayout.LayoutParams(0, dp(64), 1f))
         }
-        repeat((4 - dockApps.size).coerceAtLeast(0)) {
+        repeat((dockCapacity - dockApps.size).coerceAtLeast(0)) {
             val plus = text("+", 27f, aqua).apply {
                 contentDescription = "Tambahkan aplikasi ke dock"
                 setOnClickListener { chooseDockApp(null) }
@@ -886,6 +888,15 @@ class MainActivity : Activity() {
             setOnClickListener { columns = if (columns == 4) 5 else if (columns == 5) 6 else 4; getPreferences(MODE_PRIVATE).edit().putInt("columns", columns).apply(); page = 0; render() }
         }
         area.addView(layoutSetting, LinearLayout.LayoutParams(-1, dp(65)).apply { topMargin = dp(10) })
+        val dockSetting = text("DOCK   $dockCapacity APLIKASI  •  UBAH", 15f, aqua).apply {
+            background = shape(0xff124441.toInt(), 18, true)
+            setOnClickListener {
+                dockCapacity = if (dockCapacity == 6) 4 else dockCapacity + 1
+                getPreferences(MODE_PRIVATE).edit().putInt("dock_capacity", dockCapacity).apply()
+                buildDock(dockBar); render()
+            }
+        }
+        area.addView(dockSetting, LinearLayout.LayoutParams(-1, dp(60)))
         val wallpaperSetting = text("WALLPAPER HP  •  " + if (showWallpaper) "AKTIF" else "NONAKTIF", 15f, aqua).apply {
             background = shape(0xff124441.toInt(), 18, true)
             setOnClickListener {
@@ -936,7 +947,7 @@ class MainActivity : Activity() {
         }
         option("GESTUR DUA JARI TURUN  •  " + if (twoFingerPanel) "AKTIF" else "NONAKTIF") {
             twoFingerPanel = !twoFingerPanel
-            getPreferences(MODE_PRIVATE).edit().putBoolean("two_finger_panel", twoFingerPanel).apply()
+            getPreferences(MODE_PRIVATE).edit().putBoolean("two_finger_panel", twoFingerPanel).putInt("dock_capacity", dockCapacity).apply()
             render()
         }
         option("BACKUP TATA LETAK  •  EKSPOR") { exportLayout() }
@@ -974,6 +985,7 @@ class MainActivity : Activity() {
             put("heart_opacity", heartOpacity)
             put("wallpaper", showWallpaper)
             put("two_finger_panel", twoFingerPanel)
+            put("dock_capacity", dockCapacity)
         }
     }
     private fun exportLayout() {
@@ -1001,6 +1013,7 @@ class MainActivity : Activity() {
         heartOpacity = data.optInt("heart_opacity", 100).coerceIn(20, 100)
         showWallpaper = data.optBoolean("wallpaper", true)
         twoFingerPanel = data.optBoolean("two_finger_panel", true)
+        dockCapacity = data.optInt("dock_capacity", 4).coerceIn(4, 6)
         prefs.putInt("columns", columns).putInt("icon_size", iconSize)
             .putInt("heart_size", heartSize).putInt("heart_opacity", heartOpacity)
             .putBoolean("wallpaper", showWallpaper).putBoolean("two_finger_panel", twoFingerPanel).apply()
@@ -1012,7 +1025,7 @@ class MainActivity : Activity() {
         hiddenApps.clear()
         data.optString("hidden_apps").split("|").filter { it.isNotBlank() }.forEach { hiddenApps.add(it) }
         dockApps.clear()
-        data.optString("dock_apps").split("|").filter { it.isNotBlank() }.take(4).forEach { dockApps.add(it) }
+        data.optString("dock_apps").split("|").filter { it.isNotBlank() }.take(dockCapacity).forEach { dockApps.add(it) }
         folders.clear(); folderNames.clear(); loadFolders()
         loadApps(); applyWallpaper(); page = 0; render()
     }
