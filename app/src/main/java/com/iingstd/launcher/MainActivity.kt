@@ -648,7 +648,7 @@ class MainActivity : Activity() {
             }
             canvas.save()
             canvas.clipPath(heart)
-            val scale = minOf(w / bmp.width, h / bmp.height)
+            val scale = maxOf(w / bmp.width, h / bmp.height)
             val drawWidth = bmp.width * scale
             val drawHeight = bmp.height * scale
             val left = (w - drawWidth) / 2f
