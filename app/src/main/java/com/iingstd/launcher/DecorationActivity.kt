@@ -39,7 +39,7 @@ class DecorationActivity : Activity() {
         preview = ImageView(this).apply { scaleType = ImageView.ScaleType.FIT_CENTER }
         layout.addView(preview, LinearLayout.LayoutParams(-1, 0, 1f))
         layout.addView(Button(this).apply {
-            text = "Pilih foto hati"
+            text = "Ganti foto (opsional)"
             setOnClickListener {
                 startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
                     addCategory(Intent.CATEGORY_OPENABLE)
@@ -49,7 +49,7 @@ class DecorationActivity : Activity() {
             }
         })
         layout.addView(Button(this).apply {
-            text = "Pasang sebagai wallpaper beranda"
+            text = "AKTIFKAN WALLPAPER"
             setOnClickListener {
                 try {
                     val manager = WallpaperManager.getInstance(this@DecorationActivity)
@@ -63,6 +63,7 @@ class DecorationActivity : Activity() {
                 }
             }
         })
+        layout.addView(android.view.View(this), LinearLayout.LayoutParams(-1, dp(90)))
         setContentView(layout)
         refreshPreview()
     }
