@@ -23,7 +23,7 @@ class DecorationActivity : Activity() {
             textSize = 23f
         })
         layout.addView(TextView(this).apply {
-            text = "Launcher bawaan tetap digunakan. Foto hati dan tanda tangan muncul sebagai lapisan transparan yang tidak menangkap sentuhan. Pada versi percobaan, dekorasi juga bisa terlihat di aplikasi lain. Matikan kapan saja di sini atau melalui notifikasi."
+            text = "Launcher bawaan tetap digunakan. Foto hati dan tanda tangan muncul sebagai lapisan transparan yang tidak menangkap sentuhan. Watermark sangat transparan dan tetap berada di atas konten aplikasi secara teknis, bukan di belakangnya. Matikan kapan saja di sini atau melalui notifikasi."
             textSize = 15f
             setPadding(0, dp(14), 0, dp(18))
         })
