@@ -493,7 +493,7 @@ class MainActivity : Activity() {
             isClickable = true
         }
         val preview = FrameLayout(this).apply {
-            background = shape(0xff124441.toInt(), 14, true)
+            background = GradientDrawable(GradientDrawable.Orientation.TL_BR, intArrayOf(0xff28544f.toInt(), 0xff173532.toInt())).apply { cornerRadius = dp(17).toFloat(); setStroke(dp(1), 0x77d4af37) }
         }
         val mini = GridLayout(this).apply { columnCount = 2 }
         folders[id].orEmpty().take(4).forEach { pkg ->
@@ -599,10 +599,10 @@ class MainActivity : Activity() {
         cell.addView(ImageView(this).apply { setImageDrawable(app.icon) },
             LinearLayout.LayoutParams(dp(iconSize), dp(iconSize)))
         val labelRow = FrameLayout(this)
-        labelRow.addView(text(app.name, 11f).apply {
+        labelRow.addView(text(app.name, 11.5f, 0xfff1f2f1.toInt()).apply {
             maxLines = 2; ellipsize = android.text.TextUtils.TruncateAt.END
         }, FrameLayout.LayoutParams(-1, -1))
-        val options = text("⋮", 17f, aqua).apply {
+        val options = text("⋮", 15f, 0xffa8bbb7.toInt()).apply {
                 contentDescription = "Opsi untuk ${app.name}"
                 isClickable = true
                 setOnClickListener { appMenu(app) }
@@ -1000,12 +1000,13 @@ class MainActivity : Activity() {
         })
         dialog.show()
     }
-    private fun navPill(label: String, active: Boolean): TextView = text(label, 12f, if (active) aqua else 0xffe9cf8b.toInt()).apply {
+    private fun navPill(label: String, active: Boolean): TextView = text(label, 12f, if (active) Color.WHITE else 0xffe9cf8b.toInt()).apply {
         setTypeface(null, Typeface.BOLD)
         background = GradientDrawable().apply {
-            setColor(if (active) 0x2832E4C9 else 0x122D2619)
+            colors = if (active) intArrayOf(0xff175d58.toInt(), 0xff237b70.toInt()) else intArrayOf(0x302d302d, 0x182d2619)
+            orientation = GradientDrawable.Orientation.TL_BR
             cornerRadius = dp(25).toFloat()
-            setStroke(dp(1), if (active) 0x9932E4C9.toInt() else 0x66D4AF37)
+            setStroke(dp(1), if (active) 0x9932E4C9.toInt() else 0x44D4AF37)
         }
         val pad = dp(4)
         setPadding(pad, pad, pad, pad)
@@ -1271,10 +1272,10 @@ class MainActivity : Activity() {
     }
     private fun renderPanel() {
         val area = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-        val scrollPanel = ScrollView(this)
+        val scrollPanel = ScrollView(this).apply { isVerticalScrollBarEnabled = false; overScrollMode = View.OVER_SCROLL_IF_CONTENT_SCROLLS; isSmoothScrollingEnabled = true }
         scrollPanel.addView(area)
         content.addView(scrollPanel, FrameLayout.LayoutParams(-1, -1))
-        area.addView(text("PANEL TOSCA  •  KONTROL CEPAT", 16f, aqua), LinearLayout.LayoutParams(-1, dp(55)))
+        area.addView(text("KONTROL CEPAT", 16f, 0xffe8d6ba.toInt()).apply { setTypeface(null, Typeface.BOLD); letterSpacing = 0.08f }, LinearLayout.LayoutParams(-1, dp(55)))
         val options = listOf("Wi-Fi" to Settings.ACTION_WIFI_SETTINGS,
             "Internet" to Settings.ACTION_WIRELESS_SETTINGS,
             "Bluetooth" to Settings.ACTION_BLUETOOTH_SETTINGS,
@@ -1289,8 +1290,9 @@ class MainActivity : Activity() {
                     setTypeface(null, Typeface.BOLD)
                     background = GradientDrawable().apply {
                         shape = GradientDrawable.OVAL
-                        setColor(0xff681d40.toInt())
-                        setStroke(dp(2), 0xffa95c79.toInt())
+                        colors = intArrayOf(0xff873557.toInt(), 0xff52152f.toInt())
+                        orientation = GradientDrawable.Orientation.TL_BR
+                        setStroke(dp(1), 0xffbd7b97.toInt())
                     }
                     setOnClickListener { try { startActivity(Intent(action)) } catch (_: Exception) {} }
                 }
@@ -1301,7 +1303,8 @@ class MainActivity : Activity() {
         }
         val layoutSetting = text("TATA LETAK IKON   ${columns} KOLOM   •   UBAH", 13f, Color.WHITE).apply {
             background = GradientDrawable().apply {
-                setColor(0xff555e6a.toInt())
+                colors = intArrayOf(0xff707a86.toInt(), 0xff424a56.toInt())
+                orientation = GradientDrawable.Orientation.TL_BR
                 cornerRadius = dp(25).toFloat()
                 setStroke(dp(1), 0xffc0c6d0.toInt())
             }
