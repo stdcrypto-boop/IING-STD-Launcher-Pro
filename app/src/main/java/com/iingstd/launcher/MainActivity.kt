@@ -112,6 +112,9 @@ class MainActivity : Activity() {
     private var iconSize = 48
     private var heartSize = 112
     private var heartOpacity = 100
+    private var heartOffsetX = 0
+    private var heartOffsetY = 0
+    private var showSignature = true
     private var twoFingerPanel = true
     private var touchPointerCount = 0
     private val hiddenApps = linkedSetOf<String>()
@@ -192,6 +195,9 @@ class MainActivity : Activity() {
         iconSize = getPreferences(MODE_PRIVATE).getInt("icon_size", 48).coerceIn(36, 64)
         heartSize = getPreferences(MODE_PRIVATE).getInt("heart_size", 112).coerceIn(72, 168)
         heartOpacity = getPreferences(MODE_PRIVATE).getInt("heart_opacity", 100).coerceIn(20, 100)
+        heartOffsetX = getPreferences(MODE_PRIVATE).getInt("heart_offset_x", 0).coerceIn(-120, 120)
+        heartOffsetY = getPreferences(MODE_PRIVATE).getInt("heart_offset_y", 0).coerceIn(-180, 180)
+        showSignature = getPreferences(MODE_PRIVATE).getBoolean("show_signature", true)
         twoFingerPanel = getPreferences(MODE_PRIVATE).getBoolean("two_finger_panel", true)
         hiddenApps.addAll(getPreferences(MODE_PRIVATE).getString("hidden_apps", "")?.split("|")?.filter { it.isNotBlank() } ?: emptyList())
         drawerOrder.addAll(getPreferences(MODE_PRIVATE).getString("drawer_order", "")?.split("|")?.filter { it.isNotBlank() } ?: emptyList())
@@ -628,13 +634,15 @@ class MainActivity : Activity() {
             group.addView(HeartPhoto(this).apply { isClickable = false; alpha = heartOpacity / 100f },
                 LinearLayout.LayoutParams(dp(heartSize), dp(heartSize)))
         }
-        group.addView(text("IING SUTADI", 35f, aqua).apply {
+        if (showSignature) group.addView(text("IING SUTADI", 35f, aqua).apply {
             setTypeface(Typeface.create("cursive", Typeface.ITALIC))
             alpha = 0.38f
             isClickable = false
             isFocusable = false
         }, LinearLayout.LayoutParams(-1, dp(60)))
-        content.addView(group, FrameLayout.LayoutParams(-1, dp(heartSize + 70), Gravity.CENTER))
+        group.translationX = dp(heartOffsetX).toFloat()
+        group.translationY = dp(heartOffsetY).toFloat()
+        content.addView(group, FrameLayout.LayoutParams(-1, dp(heartSize + if (showSignature) 70 else 0), Gravity.CENTER))
     }
     private fun saveFavorites() {
         favoritesInitialized = true
@@ -946,6 +954,33 @@ class MainActivity : Activity() {
             }
         }
         area.addView(dockSetting, LinearLayout.LayoutParams(-1, dp(60)))
+        val signatureSetting = text("TANDA TANGAN  •  " + if (showSignature) "TAMPIL" else "SEMBUNYI", 15f, aqua).apply {
+            background = shape(0xff124441.toInt(), 18, true)
+            setOnClickListener {
+                showSignature = !showSignature
+                getPreferences(MODE_PRIVATE).edit().putBoolean("show_signature", showSignature).apply()
+                render()
+            }
+        }
+        area.addView(signatureSetting, LinearLayout.LayoutParams(-1, dp(58)))
+        val heartPosition = text("POSISI FOTO HATI  •  ATUR", 15f, aqua).apply {
+            background = shape(0xff124441.toInt(), 18, true)
+            setOnClickListener {
+                val choices = arrayOf("Naik 20dp", "Turun 20dp", "Geser kiri 20dp", "Geser kanan 20dp", "Kembali ke tengah")
+                AlertDialog.Builder(this@MainActivity).setTitle("Posisi foto hati").setItems(choices) { _, choice ->
+                    when (choice) {
+                        0 -> heartOffsetY = (heartOffsetY - 20).coerceIn(-180, 180)
+                        1 -> heartOffsetY = (heartOffsetY + 20).coerceIn(-180, 180)
+                        2 -> heartOffsetX = (heartOffsetX - 20).coerceIn(-120, 120)
+                        3 -> heartOffsetX = (heartOffsetX + 20).coerceIn(-120, 120)
+                        else -> { heartOffsetX = 0; heartOffsetY = 0 }
+                    }
+                    getPreferences(MODE_PRIVATE).edit().putInt("heart_offset_x", heartOffsetX).putInt("heart_offset_y", heartOffsetY).apply()
+                    render()
+                }.setNegativeButton("Batal", null).show()
+            }
+        }
+        area.addView(heartPosition, LinearLayout.LayoutParams(-1, dp(58)))
         val wallpaperSetting = text("WALLPAPER HP  •  " + if (showWallpaper) "AKTIF" else "NONAKTIF", 15f, aqua).apply {
             background = shape(0xff124441.toInt(), 18, true)
             setOnClickListener {
@@ -1032,6 +1067,9 @@ class MainActivity : Activity() {
             put("icon_size", iconSize)
             put("heart_size", heartSize)
             put("heart_opacity", heartOpacity)
+            put("heart_offset_x", heartOffsetX)
+            put("heart_offset_y", heartOffsetY)
+            put("show_signature", showSignature)
             put("wallpaper", showWallpaper)
             put("two_finger_panel", twoFingerPanel)
             put("dock_capacity", dockCapacity)
@@ -1060,11 +1098,15 @@ class MainActivity : Activity() {
         iconSize = data.optInt("icon_size", 48).coerceIn(36, 64)
         heartSize = data.optInt("heart_size", 112).coerceIn(72, 168)
         heartOpacity = data.optInt("heart_opacity", 100).coerceIn(20, 100)
+        heartOffsetX = data.optInt("heart_offset_x", 0).coerceIn(-120, 120)
+        heartOffsetY = data.optInt("heart_offset_y", 0).coerceIn(-180, 180)
+        showSignature = data.optBoolean("show_signature", true)
         showWallpaper = data.optBoolean("wallpaper", true)
         twoFingerPanel = data.optBoolean("two_finger_panel", true)
         dockCapacity = data.optInt("dock_capacity", 4).coerceIn(4, 6)
         prefs.putInt("columns", columns).putInt("icon_size", iconSize)
             .putInt("heart_size", heartSize).putInt("heart_opacity", heartOpacity)
+            .putInt("heart_offset_x", heartOffsetX).putInt("heart_offset_y", heartOffsetY).putBoolean("show_signature", showSignature)
             .putBoolean("wallpaper", showWallpaper).putBoolean("two_finger_panel", twoFingerPanel).apply()
         favorites.clear()
         data.optString("favorites_order").split("|").filter { it.isNotBlank() }.forEach { favorites.add(it) }
