@@ -1207,32 +1207,51 @@ class MainActivity : Activity() {
             "Baterai" to Settings.ACTION_BATTERY_SAVER_SETTINGS,
             "Pengaturan" to Settings.ACTION_SETTINGS)
         options.chunked(2).forEach { pair ->
-            val row = LinearLayout(this)
+            val row = LinearLayout(this).apply { gravity = Gravity.CENTER }
             area.addView(row)
             pair.forEach { (title, action) ->
-                val tile = text(title, 17f, aqua).apply {
-                    background = shape(0xff124441.toInt(), 22, true)
+                val tile = text(title, 13f, Color.WHITE).apply {
+                    setTypeface(null, Typeface.BOLD)
+                    background = GradientDrawable().apply {
+                        shape = GradientDrawable.OVAL
+                        setColor(0xff681d40.toInt())
+                        setStroke(dp(2), 0xffa95c79.toInt())
+                    }
                     setOnClickListener { try { startActivity(Intent(action)) } catch (_: Exception) {} }
                 }
-                row.addView(tile, LinearLayout.LayoutParams(0, dp(100), 1f).apply { setMargins(dp(4), dp(5), dp(4), dp(5)) })
+                val holder = FrameLayout(this).apply { isClickable = false }
+                holder.addView(tile, FrameLayout.LayoutParams(dp(104), dp(104), Gravity.CENTER))
+                row.addView(holder, LinearLayout.LayoutParams(0, dp(116), 1f).apply { setMargins(dp(4), dp(3), dp(4), dp(3)) })
             }
         }
-        val layoutSetting = text("TATA LETAK IKON   ${columns} KOLOM   •   UBAH", 15f, aqua).apply {
-            background = shape(0xff124441.toInt(), 18, true)
+        val layoutSetting = text("TATA LETAK IKON   ${columns} KOLOM   •   UBAH", 13f, Color.WHITE).apply {
+            background = GradientDrawable().apply {
+                setColor(0xff555e6a.toInt())
+                cornerRadius = dp(25).toFloat()
+                setStroke(dp(1), 0xffc0c6d0.toInt())
+            }
             setOnClickListener { columns = if (columns == 4) 5 else if (columns == 5) 6 else 4; getPreferences(MODE_PRIVATE).edit().putInt("columns", columns).apply(); page = 0; render() }
         }
-        area.addView(layoutSetting, LinearLayout.LayoutParams(-1, dp(65)).apply { topMargin = dp(10) })
-        val dockSetting = text("DOCK   $dockCapacity APLIKASI  •  UBAH", 15f, aqua).apply {
-            background = shape(0xff124441.toInt(), 18, true)
+        area.addView(layoutSetting, LinearLayout.LayoutParams(-1, dp(48)).apply { topMargin = dp(10); marginStart = dp(34); marginEnd = dp(34) })
+        val dockSetting = text("DOCK   $dockCapacity APLIKASI  •  UBAH", 13f, Color.WHITE).apply {
+            background = GradientDrawable().apply {
+                setColor(0xff555e6a.toInt())
+                cornerRadius = dp(25).toFloat()
+                setStroke(dp(1), 0xffc0c6d0.toInt())
+            }
             setOnClickListener {
                 dockCapacity = if (dockCapacity == 6) 4 else dockCapacity + 1
                 getPreferences(MODE_PRIVATE).edit().putInt("dock_capacity", dockCapacity).apply()
                 buildDock(dockBar); render()
             }
         }
-        area.addView(dockSetting, LinearLayout.LayoutParams(-1, dp(60)))
-        val dockSizeSetting = text("UKURAN IKON DOCK  •  ${dockIconSize}dp", 15f, aqua).apply {
-            background = shape(0xff124441.toInt(), 18, true)
+        area.addView(dockSetting, LinearLayout.LayoutParams(-1, dp(46)).apply { marginStart = dp(34); marginEnd = dp(34); topMargin = dp(5) })
+        val dockSizeSetting = text("UKURAN IKON DOCK  •  ${dockIconSize}dp", 13f, Color.WHITE).apply {
+            background = GradientDrawable().apply {
+                setColor(0xff555e6a.toInt())
+                cornerRadius = dp(25).toFloat()
+                setStroke(dp(1), 0xffc0c6d0.toInt())
+            }
             setOnClickListener {
                 dockIconSize = if (dockIconSize >= 62) 42 else dockIconSize + 4
                 getPreferences(MODE_PRIVATE).edit().putInt("dock_icon_size", dockIconSize).apply()
@@ -1240,18 +1259,26 @@ class MainActivity : Activity() {
                 render()
             }
         }
-        area.addView(dockSizeSetting, LinearLayout.LayoutParams(-1, dp(58)))
-        val signatureSetting = text("TANDA TANGAN  •  " + if (showSignature) "TAMPIL" else "SEMBUNYI", 15f, aqua).apply {
-            background = shape(0xff124441.toInt(), 18, true)
+        area.addView(dockSizeSetting, LinearLayout.LayoutParams(-1, dp(46)).apply { marginStart = dp(34); marginEnd = dp(34); topMargin = dp(5) })
+        val signatureSetting = text("TANDA TANGAN  •  " + if (showSignature) "TAMPIL" else "SEMBUNYI", 13f, Color.WHITE).apply {
+            background = GradientDrawable().apply {
+                setColor(0xff555e6a.toInt())
+                cornerRadius = dp(25).toFloat()
+                setStroke(dp(1), 0xffc0c6d0.toInt())
+            }
             setOnClickListener {
                 showSignature = !showSignature
                 getPreferences(MODE_PRIVATE).edit().putBoolean("show_signature", showSignature).apply()
                 render()
             }
         }
-        area.addView(signatureSetting, LinearLayout.LayoutParams(-1, dp(58)))
-        val heartPosition = text("POSISI FOTO HATI  •  ATUR", 15f, aqua).apply {
-            background = shape(0xff124441.toInt(), 18, true)
+        area.addView(signatureSetting, LinearLayout.LayoutParams(-1, dp(46)).apply { marginStart = dp(34); marginEnd = dp(34); topMargin = dp(5) })
+        val heartPosition = text("POSISI FOTO HATI  •  ATUR", 13f, Color.WHITE).apply {
+            background = GradientDrawable().apply {
+                setColor(0xff555e6a.toInt())
+                cornerRadius = dp(25).toFloat()
+                setStroke(dp(1), 0xffc0c6d0.toInt())
+            }
             setOnClickListener {
                 val choices = arrayOf("Naik 20dp", "Turun 20dp", "Geser kiri 20dp", "Geser kanan 20dp", "Kembali ke tengah")
                 AlertDialog.Builder(this@MainActivity).setTitle("Posisi foto hati").setItems(choices) { _, choice ->
@@ -1267,26 +1294,38 @@ class MainActivity : Activity() {
                 }.setNegativeButton("Batal", null).show()
             }
         }
-        area.addView(heartPosition, LinearLayout.LayoutParams(-1, dp(58)))
-        val wallpaperSetting = text("WALLPAPER HP  •  " + if (showWallpaper) "AKTIF" else "NONAKTIF", 15f, aqua).apply {
-            background = shape(0xff124441.toInt(), 18, true)
+        area.addView(heartPosition, LinearLayout.LayoutParams(-1, dp(46)).apply { marginStart = dp(34); marginEnd = dp(34); topMargin = dp(5) })
+        val wallpaperSetting = text("WALLPAPER HP  •  " + if (showWallpaper) "AKTIF" else "NONAKTIF", 13f, Color.WHITE).apply {
+            background = GradientDrawable().apply {
+                setColor(0xff555e6a.toInt())
+                cornerRadius = dp(25).toFloat()
+                setStroke(dp(1), 0xffc0c6d0.toInt())
+            }
             setOnClickListener {
                 showWallpaper = !showWallpaper
                 getPreferences(MODE_PRIVATE).edit().putBoolean("wallpaper", showWallpaper).apply()
                 applyWallpaper(); render()
             }
         }
-        area.addView(wallpaperSetting, LinearLayout.LayoutParams(-1, dp(65)).apply { topMargin = dp(10) })
-        val photoSetting = text("FOTO HATI IING SUTADI  •  PILIH FOTO", 15f, aqua).apply {
-            background = shape(0xff124441.toInt(), 18, true)
+        area.addView(wallpaperSetting, LinearLayout.LayoutParams(-1, dp(48)).apply { topMargin = dp(10); marginStart = dp(34); marginEnd = dp(34) })
+        val photoSetting = text("FOTO HATI IING SUTADI  •  PILIH FOTO", 13f, Color.WHITE).apply {
+            background = GradientDrawable().apply {
+                setColor(0xff555e6a.toInt())
+                cornerRadius = dp(25).toFloat()
+                setStroke(dp(1), 0xffc0c6d0.toInt())
+            }
             setOnClickListener { chooseSignaturePhoto() }
         }
-        area.addView(photoSetting, LinearLayout.LayoutParams(-1, dp(65)).apply { topMargin = dp(10) })
+        area.addView(photoSetting, LinearLayout.LayoutParams(-1, dp(48)).apply { topMargin = dp(10); marginStart = dp(34); marginEnd = dp(34) })
         fun option(label: String, callback: () -> Unit) {
-            area.addView(text(label, 14f, aqua).apply {
-                background = shape(0xff124441.toInt(), 18, true)
+            area.addView(text(label, 13f, Color.WHITE).apply {
+                background = GradientDrawable().apply {
+                setColor(0xff555e6a.toInt())
+                cornerRadius = dp(25).toFloat()
+                setStroke(dp(1), 0xffc0c6d0.toInt())
+            }
                 setOnClickListener { callback() }
-            }, LinearLayout.LayoutParams(-1, dp(60)).apply { topMargin = dp(8) })
+            }, LinearLayout.LayoutParams(-1, dp(46)).apply { topMargin = dp(6); marginStart = dp(34); marginEnd = dp(34) })
         }
         option("UKURAN IKON  •  ${iconSize}dp") {
             val sizes = intArrayOf(36, 42, 48, 54, 60, 64)
@@ -1323,11 +1362,15 @@ class MainActivity : Activity() {
         }
         option("BACKUP TATA LETAK  •  EKSPOR") { exportLayout() }
         option("PULIHKAN TATA LETAK  •  IMPOR") { importLayout() }
-        val defaultSetting = text("JADIKAN LAUNCHER UTAMA  ⌂", 15f, aqua).apply {
-            background = shape(0xff124441.toInt(), 18, true)
+        val defaultSetting = text("JADIKAN LAUNCHER UTAMA  ⌂", 13f, Color.WHITE).apply {
+            background = GradientDrawable().apply {
+                setColor(0xff555e6a.toInt())
+                cornerRadius = dp(25).toFloat()
+                setStroke(dp(1), 0xffc0c6d0.toInt())
+            }
             setOnClickListener { requestDefaultHome() }
         }
-        area.addView(defaultSetting, LinearLayout.LayoutParams(-1, dp(65)).apply { topMargin = dp(10) })
+        area.addView(defaultSetting, LinearLayout.LayoutParams(-1, dp(48)).apply { topMargin = dp(10); marginStart = dp(34); marginEnd = dp(34) })
         area.addView(text("Panel ini membuka pengaturan Android; tidak mengganti Quick Settings sistem.", 12f, muted),
             LinearLayout.LayoutParams(-1, dp(70)))
     }
