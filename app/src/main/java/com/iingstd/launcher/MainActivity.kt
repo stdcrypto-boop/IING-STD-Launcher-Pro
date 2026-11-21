@@ -264,8 +264,7 @@ class MainActivity : Activity() {
         }
         root.addView(brand, LinearLayout.LayoutParams(-1, dp(35)))
         val status = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL }
-        signalBars = SignalBars(this)
-        status.addView(signalBars, LinearLayout.LayoutParams(dp(48), dp(40)))
+        // Operator name replaces the unsynchronized custom signal bars.
         network = text("Memeriksa jaringan", 13f, aqua).apply { gravity = Gravity.START or Gravity.CENTER_VERTICAL }
         status.addView(network, LinearLayout.LayoutParams(0, dp(40), 1f))
         speed = text("↓ -- KB/s", 12f, muted)
@@ -1411,6 +1410,21 @@ class MainActivity : Activity() {
         folders.clear(); folderNames.clear(); loadFolders()
         loadApps(); applyWallpaper(); page = 0; render()
     }
+    private fun detectOperatorName(): String {
+        return try {
+            val tm = getSystemService(Context.TELEPHONY_SERVICE) as TelephonyManager
+            val name = if (Build.VERSION.SDK_INT >= 24) {
+                val subscriptionId = android.telephony.SubscriptionManager.getDefaultDataSubscriptionId()
+                if (subscriptionId != android.telephony.SubscriptionManager.INVALID_SUBSCRIPTION_ID) {
+                    try { tm.createForSubscriptionId(subscriptionId).networkOperatorName } catch (_: Exception) { "" }
+                } else ""
+            } else ""
+            val detected = name.takeIf { it.isNotBlank() }
+                ?: tm.networkOperatorName.takeIf { it.isNotBlank() }
+                ?: tm.simOperatorName.takeIf { it.isNotBlank() }
+            detected ?: "Operator tidak terdeteksi"
+        } catch (_: Exception) { "Operator tidak terdeteksi" }
+    }
     private fun cellularLabel(): String = radioType
     private fun updateStatus() {
         val cm = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
@@ -1422,12 +1436,8 @@ class MainActivity : Activity() {
             cap == null -> "Offline"
             else -> "Internet"
         }
-        val mobile = if (cellularServiceAvailable || radioType != "Seluler") radioType else "Seluler"
-        val statusLabel = "$mobile • $internet"
+        val statusLabel = "${detectOperatorName()} • $internet"
         if (network.text.toString() != statusLabel) network.text = statusLabel
-        signalBars.alpha = if (cellularBarsAvailable) 1f else 0.28f
-        signalBars.contentDescription = if (cellularBarsAvailable) "Kekuatan sinyal seluler $signalLevel dari 4" else "Kekuatan sinyal seluler tidak tersedia"
-        signalBars.invalidate()
         val now = SystemClock.elapsedRealtime()
         val bytes = TrafficStats.getTotalRxBytes()
         val txBytes = TrafficStats.getTotalTxBytes()
@@ -1442,11 +1452,6 @@ class MainActivity : Activity() {
         super.onStart()
         val latestBattery = registerReceiver(receiver, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
         refreshBattery(latestBattery)
-        startTelephony()
-        if (checkSelfPermission(android.Manifest.permission.READ_PHONE_STATE) != PackageManager.PERMISSION_GRANTED && !getPreferences(MODE_PRIVATE).getBoolean("phone_permission_asked", false)) {
-            getPreferences(MODE_PRIVATE).edit().putBoolean("phone_permission_asked", true).apply()
-            requestPermissions(arrayOf(android.Manifest.permission.READ_PHONE_STATE), 717)
-        }
         if (::content.isInitialized) { loadApps(); render() }
     }
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
