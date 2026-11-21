@@ -717,6 +717,42 @@ class MainActivity : Activity() {
             setOnClickListener { chooseSignaturePhoto() }
         }
         area.addView(photoSetting, LinearLayout.LayoutParams(-1, dp(65)).apply { topMargin = dp(10) })
+        fun option(label: String, callback: () -> Unit) {
+            area.addView(text(label, 14f, aqua).apply {
+                background = shape(0xff124441.toInt(), 18, true)
+                setOnClickListener { callback() }
+            }, LinearLayout.LayoutParams(-1, dp(60)).apply { topMargin = dp(8) })
+        }
+        option("UKURAN IKON  •  ${iconSize}dp") {
+            val sizes = intArrayOf(36, 42, 48, 54, 60, 64)
+            AlertDialog.Builder(this).setTitle("Ukuran ikon")
+                .setSingleChoiceItems(sizes.map { "${it}dp" }.toTypedArray(), sizes.indexOf(iconSize)) { dialog, i ->
+                    iconSize = sizes[i]
+                    getPreferences(MODE_PRIVATE).edit().putInt("icon_size", iconSize).apply()
+                    dialog.dismiss(); render()
+                }.setNegativeButton("Batal", null).show()
+        }
+        option("SEMBUNYIKAN / TAMPILKAN APLIKASI") { manageHiddenApps() }
+        option("UKURAN FOTO HATI  •  ${heartSize}dp") {
+            val sizes = intArrayOf(72, 88, 112, 136, 168)
+            AlertDialog.Builder(this).setTitle("Ukuran foto hati")
+                .setSingleChoiceItems(sizes.map { "${it}dp" }.toTypedArray(), sizes.indexOf(heartSize)) { dialog, i ->
+                    heartSize = sizes[i]
+                    getPreferences(MODE_PRIVATE).edit().putInt("heart_size", heartSize).apply()
+                    dialog.dismiss(); render()
+                }.setNegativeButton("Batal", null).show()
+        }
+        option("OPASITAS FOTO HATI  •  ${heartOpacity}%") {
+            val levels = intArrayOf(20, 40, 60, 80, 100)
+            AlertDialog.Builder(this).setTitle("Transparansi foto hati")
+                .setSingleChoiceItems(levels.map { "${it}%" }.toTypedArray(), levels.indexOf(heartOpacity)) { dialog, i ->
+                    heartOpacity = levels[i]
+                    getPreferences(MODE_PRIVATE).edit().putInt("heart_opacity", heartOpacity).apply()
+                    dialog.dismiss(); render()
+                }.setNegativeButton("Batal", null).show()
+        }
+        option("BACKUP TATA LETAK  •  EKSPOR") { exportLayout() }
+        option("PULIHKAN TATA LETAK  •  IMPOR") { importLayout() }
         val defaultSetting = text("JADIKAN LAUNCHER UTAMA  ⌂", 15f, aqua).apply {
             background = shape(0xff124441.toInt(), 18, true)
             setOnClickListener { requestDefaultHome() }
@@ -724,6 +760,69 @@ class MainActivity : Activity() {
         area.addView(defaultSetting, LinearLayout.LayoutParams(-1, dp(65)).apply { topMargin = dp(10) })
         area.addView(text("Panel ini membuka pengaturan Android; tidak mengganti Quick Settings sistem.", 12f, muted),
             LinearLayout.LayoutParams(-1, dp(70)))
+    }
+    private fun manageHiddenApps() {
+        val choices = apps.toList()
+        val checked = BooleanArray(choices.size) { choices[it].pkg in hiddenApps }
+        AlertDialog.Builder(this).setTitle("Sembunyikan dari daftar aplikasi")
+            .setMultiChoiceItems(choices.map { it.name }.toTypedArray(), checked) { _, i, value -> checked[i] = value }
+            .setPositiveButton("Simpan") { _, _ ->
+                hiddenApps.clear()
+                choices.forEachIndexed { i, app -> if (checked[i]) hiddenApps.add(app.pkg) }
+                getPreferences(MODE_PRIVATE).edit().putString("hidden_apps", hiddenApps.joinToString("|")).apply()
+                page = 0; render()
+            }.setNegativeButton("Batal", null).show()
+    }
+    private fun layoutJson(): JSONObject {
+        val prefs = getPreferences(MODE_PRIVATE)
+        return JSONObject().apply {
+            put("format", "iing-std-layout-v1")
+            listOf("favorites_order", "drawer_order", "folder_data", "hidden_apps").forEach {
+                put(it, prefs.getString(it, if (it == "folder_data") "{}" else "") ?: "")
+            }
+            put("columns", columns)
+            put("icon_size", iconSize)
+            put("heart_size", heartSize)
+            put("heart_opacity", heartOpacity)
+            put("wallpaper", showWallpaper)
+        }
+    }
+    private fun exportLayout() {
+        startActivityForResult(Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
+            addCategory(Intent.CATEGORY_OPENABLE)
+            type = "application/json"
+            putExtra(Intent.EXTRA_TITLE, "IING-STD-Launcher-Backup.json")
+        }, 613)
+    }
+    private fun importLayout() {
+        startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+            addCategory(Intent.CATEGORY_OPENABLE)
+            type = "application/json"
+        }, 614)
+    }
+    private fun restoreLayout(data: JSONObject) {
+        if (data.optString("format") != "iing-std-layout-v1") throw IllegalArgumentException("Format tidak cocok")
+        val prefs = getPreferences(MODE_PRIVATE).edit()
+        listOf("favorites_order", "drawer_order", "folder_data", "hidden_apps").forEach {
+            prefs.putString(it, data.optString(it, if (it == "folder_data") "{}" else ""))
+        }
+        columns = data.optInt("columns", 4).coerceIn(4, 6)
+        iconSize = data.optInt("icon_size", 48).coerceIn(36, 64)
+        heartSize = data.optInt("heart_size", 112).coerceIn(72, 168)
+        heartOpacity = data.optInt("heart_opacity", 100).coerceIn(20, 100)
+        showWallpaper = data.optBoolean("wallpaper", true)
+        prefs.putInt("columns", columns).putInt("icon_size", iconSize)
+            .putInt("heart_size", heartSize).putInt("heart_opacity", heartOpacity)
+            .putBoolean("wallpaper", showWallpaper).apply()
+        favorites.clear()
+        data.optString("favorites_order").split("|").filter { it.isNotBlank() }.forEach { favorites.add(it) }
+        favoritesInitialized = true
+        drawerOrder.clear()
+        data.optString("drawer_order").split("|").filter { it.isNotBlank() }.forEach { drawerOrder.add(it) }
+        hiddenApps.clear()
+        data.optString("hidden_apps").split("|").filter { it.isNotBlank() }.forEach { hiddenApps.add(it) }
+        folders.clear(); folderNames.clear(); loadFolders()
+        loadApps(); applyWallpaper(); page = 0; render()
     }
     private fun cellularLabel(): String {
         return try {
