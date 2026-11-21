@@ -128,7 +128,7 @@ class MainActivity : Activity() {
         getPreferences(MODE_PRIVATE).getString("favorites_order", "")?.split("|")?.filter { it.isNotBlank() }?.forEach { favorites.add(it) }
         root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(dp(16), dp(8), dp(16), dp(50))
+            setPadding(dp(16), dp(8), dp(16), dp(82))
             background = GradientDrawable(GradientDrawable.Orientation.TL_BR,
                 intArrayOf(0xff061719.toInt(), 0xff104441.toInt(), 0xff082126.toInt()))
         }
@@ -539,7 +539,7 @@ class MainActivity : Activity() {
     }
     private fun appMenu(app: App) {
         AlertDialog.Builder(this).setTitle(app.name)
-            .setItems(arrayOf("Buka", if (favorites.contains(app.pkg)) "Hapus dari beranda" else "Tambahkan ke beranda", "Pindahkan ikon ke awal", "Info aplikasi", "Uninstall")) { _, option ->
+            .setItems(arrayOf("Buka", if (favorites.contains(app.pkg)) "Hapus dari beranda" else "Tambahkan ke beranda", "Pindahkan ikon ke awal", "Info aplikasi", "Uninstall", "Buat / masukkan ke folder")) { _, option ->
                 try {
                     when (option) {
                         0 -> startActivity(app.launch)
@@ -547,9 +547,41 @@ class MainActivity : Activity() {
                         2 -> { favorites.remove(app.pkg); val old = favorites.toList(); favorites.clear(); favorites.add(app.pkg); favorites.addAll(old); saveFavorites(); page = 0; render() }
                         3 -> startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${app.pkg}")))
                         4 -> startActivity(Intent(Intent.ACTION_DELETE, Uri.parse("package:${app.pkg}")))
+                        5 -> chooseFolderFor(app)
                     }
                 } catch (_: Exception) { Toast.makeText(this, "Tindakan tidak tersedia", Toast.LENGTH_SHORT).show() }
             }.show()
+    }
+    private fun chooseFolderFor(app: App) {
+        val options = mutableListOf("Buat folder baru")
+        options.addAll(folders.keys.map { "Masukkan ke ${folderNames[it] ?: "Folder"}" })
+        AlertDialog.Builder(this).setTitle("Kelompokkan ${app.name}")
+            .setItems(options.toTypedArray()) { _, index ->
+                if (index == 0) {
+                    val candidates = apps.filter { it.pkg != app.pkg && it.pkg !in folders.values.flatten() }
+                    if (candidates.isEmpty()) {
+                        Toast.makeText(this, "Tidak ada aplikasi lain untuk digabung", Toast.LENGTH_SHORT).show()
+                    } else {
+                        AlertDialog.Builder(this).setTitle("Gabungkan dengan aplikasi")
+                            .setItems(candidates.map { it.name }.toTypedArray()) { _, selected ->
+                                val other = candidates[selected]
+                                val id = UUID.randomUUID().toString()
+                                folders[id] = mutableListOf(app.pkg, other.pkg)
+                                folderNames[id] = "Folder Baru"
+                                favorites.remove(app.pkg); favorites.remove(other.pkg)
+                                favorites.add("folder:" + id)
+                                saveFolders(); render()
+                                renameFolder(id)
+                            }.setNegativeButton("Batal", null).show()
+                    }
+                } else {
+                    val id = folders.keys.elementAt(index - 1)
+                    folders[id]?.remove(app.pkg)
+                    if (folders[id]?.contains(app.pkg) != true) folders[id]?.add(app.pkg)
+                    favorites.remove(app.pkg)
+                    saveFolders(); render()
+                }
+            }.setNegativeButton("Batal", null).show()
     }
     private fun buildDock(dock: LinearLayout) {
         dock.removeAllViews()
