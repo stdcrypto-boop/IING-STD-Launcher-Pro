@@ -80,7 +80,7 @@ class DecorationService : Service() {
             setTextColor(0xff32e4c9.toInt())
             typeface = Typeface.create("cursive", Typeface.ITALIC)
             gravity = Gravity.CENTER
-            alpha = .23f
+            alpha = .90f
         }, LinearLayout.LayoutParams(-1, dp(55)))
         val flags = WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
             WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
