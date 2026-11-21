@@ -30,14 +30,14 @@ class DecorationService : Service() {
         val notification = if (Build.VERSION.SDK_INT >= 26) Notification.Builder(this, channel) else Notification.Builder(this)
         notification.setSmallIcon(android.R.drawable.ic_menu_gallery)
             .setContentTitle("Dekorasi IING STD aktif")
-            .setContentText("Foto dan tanda tangan tampil • ketuk Sembunyikan untuk mematikan")
+            .setContentText("Watermark transparan aktif • ketuk Sembunyikan untuk mematikan")
             .addAction(android.R.drawable.ic_menu_close_clear_cancel, "Sembunyikan", stopIntent)
         startForeground(21, notification.build())
-        // No global overlay: it would cover other apps. Use the home widget instead.
+        showDecoration()
     }
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent?.action == "STOP") { stopSelf(); return START_NOT_STICKY }
-        // Overlay deliberately disabled; home-only decoration is provided by a widget.
+        if (overlay == null) showDecoration()
         return START_NOT_STICKY
     }
     private fun showDecoration() {
@@ -80,7 +80,7 @@ class DecorationService : Service() {
             setTextColor(0xff32e4c9.toInt())
             typeface = Typeface.create("cursive", Typeface.ITALIC)
             gravity = Gravity.CENTER
-            alpha = .8f
+            alpha = .23f
         }, LinearLayout.LayoutParams(-1, dp(55)))
         val flags = WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
             WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
@@ -89,7 +89,7 @@ class DecorationService : Service() {
         val params = WindowManager.LayoutParams(dp(280), dp(210),
             WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY, flags, PixelFormat.TRANSLUCENT).apply {
             gravity = Gravity.CENTER
-            if (Build.VERSION.SDK_INT >= 31) alpha = 0.8f
+            alpha = 0.22f
         }
         try {
             windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
