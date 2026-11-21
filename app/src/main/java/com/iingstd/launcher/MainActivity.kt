@@ -617,22 +617,75 @@ class MainActivity : Activity() {
                 }
             }.setNegativeButton("Batal", null).show()
     }
+    private fun saveDock() {
+        getPreferences(MODE_PRIVATE).edit().putString("dock_apps", dockApps.joinToString("|")).apply()
+    }
+    private fun addToDock(pkg: String) {
+        if (pkg in dockApps) return
+        if (dockApps.size >= 4) {
+            AlertDialog.Builder(this).setTitle("Ganti aplikasi di dock")
+                .setItems(dockApps.map { id -> apps.firstOrNull { it.pkg == id }?.name ?: id }.toTypedArray()) { _, index ->
+                    dockApps[index] = pkg
+                    saveDock(); buildDock(dockBar)
+                }.setNegativeButton("Batal", null).show()
+        } else {
+            dockApps.add(pkg); saveDock(); buildDock(dockBar)
+        }
+    }
+    private fun chooseDockApp(oldPkg: String?) {
+        val available = apps.filter { it.pkg !in dockApps }
+        AlertDialog.Builder(this).setTitle("Pilih aplikasi dock")
+            .setItems(available.map { it.name }.toTypedArray()) { _, i ->
+                if (oldPkg == null) addToDock(available[i].pkg)
+                else {
+                    val index = dockApps.indexOf(oldPkg)
+                    if (index >= 0) dockApps[index] = available[i].pkg
+                    saveDock(); buildDock(dockBar)
+                }
+            }.setNegativeButton("Batal", null).show()
+    }
     private fun buildDock(dock: LinearLayout) {
         dock.removeAllViews()
-        val preferred = listOf("dialer", "messag", "camera", "chrome")
-        preferred.forEach { key ->
-            val app = apps.firstOrNull { it.pkg.contains(key, true) || it.name.contains(key, true) }
+        dock.setOnDragListener { _, event ->
+            when (event.action) {
+                DragEvent.ACTION_DRAG_STARTED -> event.clipDescription?.hasMimeType("text/plain") == true
+                DragEvent.ACTION_DROP -> {
+                    val pkg = event.localState as? String
+                    if (pkg != null && apps.any { it.pkg == pkg }) addToDock(pkg)
+                    true
+                }
+                else -> true
+            }
+        }
+        dockApps.take(4).forEach { pkg ->
+            val app = apps.firstOrNull { it.pkg == pkg }
             val image = ImageView(this)
             if (app != null) {
                 image.setImageDrawable(app.icon)
+                image.contentDescription = "Dock: " + app.name
                 image.setOnClickListener { try { startActivity(app.launch) } catch (_: Exception) {} }
-                image.setOnLongClickListener { appMenu(app); true }
-            } else {
-                image.setImageResource(android.R.drawable.ic_menu_help)
-                image.alpha = 0.3f
+                image.setOnLongClickListener {
+                    AlertDialog.Builder(this).setTitle("Dock: " + app.name)
+                        .setItems(arrayOf("Buka", "Ganti aplikasi", "Hapus dari dock", "Info aplikasi")) { _, i ->
+                            when (i) {
+                                0 -> try { startActivity(app.launch) } catch (_: Exception) {}
+                                1 -> chooseDockApp(pkg)
+                                2 -> { dockApps.remove(pkg); saveDock(); buildDock(dockBar) }
+                                3 -> startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:" + app.pkg)))
+                            }
+                        }.show()
+                    true
+                }
             }
             image.setPadding(dp(10), dp(10), dp(10), dp(10))
             dock.addView(image, LinearLayout.LayoutParams(0, dp(64), 1f))
+        }
+        repeat((4 - dockApps.size).coerceAtLeast(0)) {
+            val plus = text("+", 27f, aqua).apply {
+                contentDescription = "Tambahkan aplikasi ke dock"
+                setOnClickListener { chooseDockApp(null) }
+            }
+            dock.addView(plus, LinearLayout.LayoutParams(0, dp(64), 1f))
         }
     }
     private fun render() {
