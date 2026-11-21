@@ -154,26 +154,41 @@ class MainActivity : Activity() {
         battery = text("BAT --", 16f, aqua)
         status.addView(battery)
         root.addView(status)
-        clock = text("", 43f).apply { setTypeface(null, Typeface.BOLD) }
-        root.addView(clock, LinearLayout.LayoutParams(-1, dp(75)))
+        val clockRow = LinearLayout(this).apply { gravity = Gravity.CENTER; orientation = LinearLayout.HORIZONTAL }
+        val roosterLeft = text("🐓", 19f).apply { contentDescription = "Ayam menghadap depan kiri" }
+        clockRow.addView(roosterLeft, LinearLayout.LayoutParams(dp(38), dp(64)))
+        clock = text("", 35f).apply {
+            setTypeface(null, Typeface.BOLD)
+            background = GradientDrawable().apply {
+                setColor(0x132A2514)
+                cornerRadius = dp(17).toFloat()
+                setStroke(dp(1), 0x66D4AF37)
+            }
+            setPadding(dp(12), 0, dp(12), 0)
+        }
+        clockRow.addView(clock, LinearLayout.LayoutParams(-2, dp(61)))
+        val roosterRight = text("🐓", 19f).apply { contentDescription = "Ayam menghadap depan kanan" }
+        clockRow.addView(roosterRight, LinearLayout.LayoutParams(dp(38), dp(64)))
+        root.addView(clockRow, LinearLayout.LayoutParams(-1, dp(70)))
         date = text("", 13f, muted)
         root.addView(date, LinearLayout.LayoutParams(-1, dp(28)))
         val actions = LinearLayout(this).apply { gravity = Gravity.CENTER }
-        val home = text("⌂  BERANDA", 12f, aqua)
+        val home = navPill("⌂  BERANDA", true)
         home.setOnClickListener { drawer = false; panel = false; render() }
         actions.addView(home, LinearLayout.LayoutParams(0, dp(48), 1f))
-        val all = text("⊞  APLIKASI", 12f, aqua)
+        val all = navPill("⊞  APLIKASI", false)
         all.setOnClickListener { drawer = true; panel = false; page = 0; render() }
         actions.addView(all, LinearLayout.LayoutParams(0, dp(48), 1f))
-        val controls = text("☷  PANEL", 12f, aqua)
+        val controls = navPill("☷  PANEL", false)
         controls.setOnClickListener { panel = !panel; render() }
         actions.addView(controls, LinearLayout.LayoutParams(0, dp(48), 1f))
-        root.addView(actions)
+        actions.setPadding(dp(5), dp(3), dp(5), dp(3))
+        root.addView(actions, LinearLayout.LayoutParams(-1, dp(57)))
         content = FrameLayout(this)
         root.addView(content, LinearLayout.LayoutParams(-1, 0, 1f))
         val dock = LinearLayout(this).apply {
             gravity = Gravity.CENTER
-            background = shape(0xdd103c3b.toInt(), 24, true)
+            background = null
         }
         root.addView(dock, LinearLayout.LayoutParams(-1, dp(74)))
         dock.tag = "dock"
@@ -653,6 +668,16 @@ class MainActivity : Activity() {
                 }
             }.setNegativeButton("Batal", null).show()
     }
+    private fun navPill(label: String, active: Boolean): TextView = text(label, 12f, if (active) aqua else 0xffe9cf8b.toInt()).apply {
+        setTypeface(null, Typeface.BOLD)
+        background = GradientDrawable().apply {
+            setColor(if (active) 0x2832E4C9 else 0x122D2619)
+            cornerRadius = dp(25).toFloat()
+            setStroke(dp(1), if (active) 0x9932E4C9.toInt() else 0x66D4AF37)
+        }
+        val pad = dp(4)
+        setPadding(pad, pad, pad, pad)
+    }
     private fun buildDock(dock: LinearLayout) {
         dock.removeAllViews()
         dock.setOnDragListener { _, event ->
@@ -686,8 +711,15 @@ class MainActivity : Activity() {
                     true
                 }
             }
+            image.background = GradientDrawable().apply {
+                setColor(0x16D4AF37)
+                cornerRadius = dp(31).toFloat()
+                setStroke(dp(1), 0xA0D4AF37.toInt())
+            }
             image.setPadding(dp(10), dp(10), dp(10), dp(10))
-            dock.addView(image, LinearLayout.LayoutParams(0, dp(64), 1f))
+            val slot = FrameLayout(this)
+            slot.addView(image, FrameLayout.LayoutParams(dp(58), dp(58), Gravity.CENTER))
+            dock.addView(slot, LinearLayout.LayoutParams(0, dp(64), 1f))
         }
         repeat((4 - dockApps.size).coerceAtLeast(0)) {
             val plus = text("+", 27f, aqua).apply {
@@ -753,10 +785,14 @@ class MainActivity : Activity() {
         }
         area.addView(search, LinearLayout.LayoutParams(-1, dp(52)))
         val addToHome = text("＋ TAMBAH APLIKASI KE BERANDA", 13f, aqua).apply {
-            background = shape(0xff124441.toInt(), 14, true)
+            background = shape(0x1712A99C, 28, true)
             setOnClickListener { showAddToHomePicker() }
         }
-        area.addView(addToHome, LinearLayout.LayoutParams(-1, dp(44)))
+        val addRow = LinearLayout(this).apply { gravity = Gravity.CENTER }
+        addRow.addView(addToHome, LinearLayout.LayoutParams(dp(244), dp(40)))
+        val endDot = text("●", 9f, aqua).apply { alpha = 0.55f }
+        addRow.addView(endDot, LinearLayout.LayoutParams(dp(19), dp(40)))
+        area.addView(addRow, LinearLayout.LayoutParams(-1, dp(46)))
         val pager = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL }
         val prev = text("‹", 30f, aqua)
         pager.addView(prev, LinearLayout.LayoutParams(dp(50), dp(43)))
