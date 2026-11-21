@@ -40,6 +40,8 @@ class MainActivity : Activity() {
     private val muted = 0xffa6c7c6.toInt()
     private val handler = Handler(Looper.getMainLooper())
     private val apps = mutableListOf<App>()
+    private var homeSelectionMode = false
+    private val selectedHomeApps = mutableSetOf<String>()
     private data class App(val name: String, val pkg: String, val launch: Intent, val icon: android.graphics.drawable.Drawable)
     private lateinit var root: LinearLayout
     private lateinit var clock: TextView
@@ -1029,7 +1031,53 @@ class MainActivity : Activity() {
             gravity = Gravity.START or Gravity.CENTER_VERTICAL
             setTypeface(null, Typeface.BOLD)
         }
-        area.addView(heading, LinearLayout.LayoutParams(-1, dp(40)))
+        val toolbar = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL }
+        toolbar.addView(heading, LinearLayout.LayoutParams(0, dp(40), 1f))
+        val manage = text(if (homeSelectionMode) "BATAL" else "☑ PILIH", 12f, aqua).apply {
+            setTypeface(null, Typeface.BOLD)
+            setOnClickListener {
+                homeSelectionMode = !homeSelectionMode
+                selectedHomeApps.clear()
+                render()
+            }
+        }
+        toolbar.addView(manage, LinearLayout.LayoutParams(dp(88), dp(40)))
+        area.addView(toolbar, LinearLayout.LayoutParams(-1, dp(40)))
+        if (homeSelectionMode) {
+            val actions = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL }
+            val count = text("${selectedHomeApps.size} dipilih", 12f, Color.WHITE)
+            actions.addView(count, LinearLayout.LayoutParams(0, dp(44), 1f))
+            val selectAll = text("SEMUA", 12f, aqua).apply {
+                setOnClickListener {
+                    val available = favorites.filter { !it.startsWith("folder:") }
+                    if (selectedHomeApps.size == available.size) selectedHomeApps.clear()
+                    else { selectedHomeApps.clear(); selectedHomeApps.addAll(available) }
+                    render()
+                }
+            }
+            actions.addView(selectAll, LinearLayout.LayoutParams(dp(75), dp(44)))
+            val remove = text("HAPUS (${selectedHomeApps.size})", 12f, 0xffffb3a8.toInt()).apply {
+                setOnClickListener {
+                    if (selectedHomeApps.isEmpty()) {
+                        Toast.makeText(this@MainActivity, "Pilih aplikasi dahulu", Toast.LENGTH_SHORT).show()
+                    } else {
+                        val amount = selectedHomeApps.size
+                        AlertDialog.Builder(this@MainActivity)
+                            .setTitle("Hapus $amount ikon dari beranda?")
+                            .setMessage("Hanya menghapus pintasan dari beranda. Aplikasi tidak di-uninstall.")
+                            .setPositiveButton("Hapus") { _, _ ->
+                                favorites.removeAll(selectedHomeApps)
+                                selectedHomeApps.clear()
+                                homeSelectionMode = false
+                                saveFavorites()
+                                render()
+                            }.setNegativeButton("Batal", null).show()
+                    }
+                }
+            }
+            actions.addView(remove, LinearLayout.LayoutParams(dp(110), dp(44)))
+            area.addView(actions, LinearLayout.LayoutParams(-1, dp(44)))
+        }
         val grid = GridLayout(this).apply { columnCount = columns }
         val homeScroll = ScrollView(this).apply { isFillViewport = true; addView(grid) }
         area.addView(homeScroll, LinearLayout.LayoutParams(-1, 0, 1f))
@@ -1040,7 +1088,31 @@ class MainActivity : Activity() {
         val width = (resources.displayMetrics.widthPixels - dp(32)) / columns
         homeItems.drop(page * perPage).take(perPage).forEach { key ->
             if (key.startsWith("folder:")) grid.addView(folderCell(key.removePrefix("folder:"), width, dp(106)))
-            else apps.firstOrNull { it.pkg == key }?.let { grid.addView(iconCell(it, width, dp(106))) }
+            else apps.firstOrNull { it.pkg == key }?.let { app ->
+                if (!homeSelectionMode) grid.addView(iconCell(app, width, dp(106)))
+                else {
+                    val wrapper = FrameLayout(this)
+                    val icon = ImageView(this).apply { setImageDrawable(app.icon) }
+                    wrapper.addView(icon, FrameLayout.LayoutParams(dp(iconSize), dp(iconSize), Gravity.TOP or Gravity.CENTER_HORIZONTAL).apply { topMargin = dp(8) })
+                    val label = text(app.name, 11f).apply {
+                        maxLines = 2
+                        ellipsize = android.text.TextUtils.TruncateAt.END
+                    }
+                    wrapper.addView(label, FrameLayout.LayoutParams(-1, dp(36), Gravity.BOTTOM))
+                    val check = CheckBox(this).apply {
+                        isChecked = selectedHomeApps.contains(app.pkg)
+                        isClickable = false
+                        isFocusable = false
+                        buttonTintList = android.content.res.ColorStateList.valueOf(aqua)
+                    }
+                    wrapper.addView(check, FrameLayout.LayoutParams(dp(42), dp(42), Gravity.TOP or Gravity.END))
+                    wrapper.setOnClickListener {
+                        if (!selectedHomeApps.add(app.pkg)) selectedHomeApps.remove(app.pkg)
+                        render()
+                    }
+                    grid.addView(wrapper, GridLayout.LayoutParams().apply { this.width = width; this.height = dp(106) })
+                }
+            }
         }
         val indicator = LinearLayout(this).apply { gravity = Gravity.CENTER }
         for (i in 0..maxPage.coerceAtMost(12)) {
@@ -1054,7 +1126,7 @@ class MainActivity : Activity() {
         }
         area.addView(indicator, LinearLayout.LayoutParams(-1, dp(26)))
         val hint = text("← Geser halaman →  •  ↑ Semua aplikasi  •  Tahan ikon untuk mengatur", 11f, muted)
-        hint.setOnClickListener { drawer = true; page = 0; render() }
+        hint.setOnClickListener { homeSelectionMode = false; selectedHomeApps.clear(); drawer = true; page = 0; render() }
         area.addView(hint, LinearLayout.LayoutParams(-1, dp(35)))
     }
     private fun renderDrawer() {
