@@ -828,16 +828,76 @@ class MainActivity : Activity() {
         }
     }
     private fun chooseDockApp(oldPkg: String?) {
-        val available = apps.filter { it.pkg !in dockApps }
-        AlertDialog.Builder(this).setTitle("Pilih aplikasi dock")
-            .setItems(available.map { it.name }.toTypedArray()) { _, i ->
-                if (oldPkg == null) addToDock(available[i].pkg)
-                else {
-                    val index = dockApps.indexOf(oldPkg)
-                    if (index >= 0) dockApps[index] = available[i].pkg
-                    saveDock(); buildDock(dockBar)
+        val available = apps.filter { it.pkg !in dockApps }.sortedBy { it.name.lowercase(Locale.getDefault()) }
+        if (available.isEmpty()) {
+            Toast.makeText(this, "Tidak ada aplikasi lain yang tersedia", Toast.LENGTH_SHORT).show()
+            return
+        }
+        val dialogLayout = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(12), dp(8), dp(12), dp(4))
+        }
+        val search = EditText(this).apply {
+            hint = "Cari aplikasi..."
+            setSingleLine(true)
+            setPadding(dp(12), dp(10), dp(12), dp(10))
+        }
+        dialogLayout.addView(search, LinearLayout.LayoutParams(-1, dp(54)))
+        val list = ListView(this).apply { dividerHeight = dp(1) }
+        dialogLayout.addView(list, LinearLayout.LayoutParams(-1, dp(440)))
+        val filtered = available.toMutableList()
+        val adapter = object : ArrayAdapter<App>(this, android.R.layout.simple_list_item_1, filtered) {
+            override fun getView(position: Int, convertView: View?, parent: android.view.ViewGroup): View {
+                val row = LinearLayout(this@MainActivity).apply {
+                    orientation = LinearLayout.HORIZONTAL
+                    gravity = Gravity.CENTER_VERTICAL
+                    setPadding(dp(14), dp(7), dp(14), dp(7))
+                    minimumHeight = dp(60)
                 }
-            }.setNegativeButton("Batal", null).show()
+                val app = getItem(position)!!
+                row.addView(ImageView(this@MainActivity).apply {
+                    setImageDrawable(app.icon)
+                    contentDescription = "Logo " + app.name
+                }, LinearLayout.LayoutParams(dp(42), dp(42)))
+                row.addView(TextView(this@MainActivity).apply {
+                    text = app.name
+                    textSize = 16f
+                    setTextColor(Color.WHITE)
+                    maxLines = 2
+                    ellipsize = android.text.TextUtils.TruncateAt.END
+                }, LinearLayout.LayoutParams(0, -2, 1f).apply { marginStart = dp(16) })
+                return row
+            }
+        }
+        list.adapter = adapter
+        val dialog = AlertDialog.Builder(this)
+            .setTitle("Pilih aplikasi dock")
+            .setView(dialogLayout)
+            .setNegativeButton("Batal", null)
+            .create()
+        list.setOnItemClickListener { _, _, position, _ ->
+            val selected = filtered[position].pkg
+            if (oldPkg == null) addToDock(selected)
+            else {
+                val index = dockApps.indexOf(oldPkg)
+                if (index >= 0) {
+                    dockApps[index] = selected
+                    saveDock()
+                    buildDock(dockBar)
+                }
+            }
+            dialog.dismiss()
+        }
+        search.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+                filtered.clear()
+                filtered.addAll(available.filter { it.name.contains(s?.toString().orEmpty(), ignoreCase = true) })
+                adapter.notifyDataSetChanged()
+            }
+            override fun afterTextChanged(s: Editable?) {}
+        })
+        dialog.show()
     }
     private fun navPill(label: String, active: Boolean): TextView = text(label, 12f, if (active) aqua else 0xffe9cf8b.toInt()).apply {
         setTypeface(null, Typeface.BOLD)
