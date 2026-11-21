@@ -117,6 +117,7 @@ class MainActivity : Activity() {
     private var showSignature = true
     private var twoFingerPanel = true
     private var touchPointerCount = 0
+    private var gestureStartedInWorkspace = false
     private val hiddenApps = linkedSetOf<String>()
     private val favorites = linkedSetOf<String>()
     private val drawerOrder = mutableListOf<String>()
@@ -319,18 +320,19 @@ class MainActivity : Activity() {
             touchPointerCount = 1
             gestureX = ev.rawX
             gestureY = ev.rawY
+            val bounds = IntArray(2)
+            content.getLocationOnScreen(bounds)
+            gestureStartedInWorkspace = gestureY >= bounds[1] && gestureY <= bounds[1] + content.height
         }
         if (ev.actionMasked == MotionEvent.ACTION_POINTER_DOWN) touchPointerCount = maxOf(touchPointerCount, ev.pointerCount)
-        if (ev.actionMasked == MotionEvent.ACTION_UP && touchPointerCount >= 2 && twoFingerPanel && ev.rawY - gestureY > dp(110)) {
+        if (ev.actionMasked == MotionEvent.ACTION_UP && gestureStartedInWorkspace && touchPointerCount >= 2 && twoFingerPanel && ev.rawY - gestureY > dp(110)) {
             panel = true; render(); touchPointerCount = 0; return true
         }
-        if (ev.actionMasked == MotionEvent.ACTION_UP && touchPointerCount < 2 && !panel) {
+        if (ev.actionMasked == MotionEvent.ACTION_UP && gestureStartedInWorkspace && touchPointerCount < 2 && !panel) {
             val dx = ev.rawX - gestureX
             val dy = ev.rawY - gestureY
             // Only the workspace handles paging gestures; keep the system bars and dock untouched.
-            val location = IntArray(2)
-            content.getLocationOnScreen(location)
-            val inWorkspace = gestureY >= location[1] && gestureY <= location[1] + content.height
+            val inWorkspace = gestureStartedInWorkspace
             if (inWorkspace && kotlin.math.abs(dx) > dp(65) && kotlin.math.abs(dx) > kotlin.math.abs(dy) * 1.3f) {
                 if (drawer) {
                     val matches = apps.count { it.pkg !in hiddenApps && it.name.contains(drawerQuery, true) }
@@ -347,14 +349,14 @@ class MainActivity : Activity() {
                 render()
                 return true
             }
-            if (!drawer && dy < -dp(100) && kotlin.math.abs(dy) > kotlin.math.abs(dx) * 1.5f) {
+            if (inWorkspace && !drawer && dy < -dp(100) && kotlin.math.abs(dy) > kotlin.math.abs(dx) * 1.5f) {
                 drawer = true; page = 0; render(); return true
             }
-            if (drawer && dy > dp(120) && kotlin.math.abs(dy) > kotlin.math.abs(dx) * 1.5f) {
+            if (inWorkspace && drawer && dy > dp(120) && kotlin.math.abs(dy) > kotlin.math.abs(dx) * 1.5f) {
                 drawer = false; page = 0; render(); return true
             }
         }
-        if (ev.actionMasked == MotionEvent.ACTION_UP || ev.actionMasked == MotionEvent.ACTION_CANCEL) touchPointerCount = 0
+        if (ev.actionMasked == MotionEvent.ACTION_UP || ev.actionMasked == MotionEvent.ACTION_CANCEL) { touchPointerCount = 0; gestureStartedInWorkspace = false }
         return super.dispatchTouchEvent(ev)
     }
     private fun applyWallpaper() {
