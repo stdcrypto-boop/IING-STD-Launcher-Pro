@@ -44,6 +44,8 @@ class MainActivity : Activity() {
     private var lastAt = 0L
     private var startX = 0f
     private var startY = 0f
+    private var gestureX = 0f
+    private var gestureY = 0f
     private val tick = object : Runnable {
         override fun run() {
             if (::clock.isInitialized) {
@@ -88,6 +90,7 @@ class MainActivity : Activity() {
         super.onCreate(savedInstanceState)
         window.statusBarColor = 0xff061a1d.toInt()
         window.navigationBarColor = 0xff061a1d.toInt()
+        columns = getPreferences(MODE_PRIVATE).getInt("columns", 4).coerceIn(4, 6)
         root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(16), dp(8), dp(16), dp(12))
@@ -137,6 +140,33 @@ class MainActivity : Activity() {
         buildDock(dock)
         render()
         handler.post(tick)
+    }
+    override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
+        if (ev.actionMasked == MotionEvent.ACTION_DOWN) {
+            gestureX = ev.rawX
+            gestureY = ev.rawY
+        }
+        if (ev.actionMasked == MotionEvent.ACTION_UP && !panel) {
+            val dx = ev.rawX - gestureX
+            val dy = ev.rawY - gestureY
+            if (kotlin.math.abs(dx) > dp(90) && kotlin.math.abs(dx) > kotlin.math.abs(dy) * 1.4f) {
+                if (!drawer) {
+                    val maxPage = ((apps.size.coerceAtLeast(1) - 1) / (columns * 4))
+                    page = (page + if (dx < 0) 1 else -1).coerceIn(0, maxPage)
+                } else {
+                    page = (page + if (dx < 0) 1 else -1).coerceAtLeast(0)
+                }
+                render()
+                return true
+            }
+            if (!drawer && dy < -dp(100) && kotlin.math.abs(dy) > kotlin.math.abs(dx) * 1.5f) {
+                drawer = true; page = 0; render(); return true
+            }
+            if (drawer && dy > dp(120) && kotlin.math.abs(dy) > kotlin.math.abs(dx) * 1.5f) {
+                drawer = false; page = 0; render(); return true
+            }
+        }
+        return super.dispatchTouchEvent(ev)
     }
     private fun loadApps() {
         apps.clear()
@@ -206,37 +236,35 @@ class MainActivity : Activity() {
     }
     private fun renderHome() {
         val area = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-        content.addView(area)
-        val spacer = View(this)
-        area.addView(spacer, LinearLayout.LayoutParams(-1, dp(32)))
-        val widget = text("◉   IING STD CYBER\n\n▂▄▆█  •  ${battery.text}\n${speed.text}", 17f, aqua).apply {
-            background = shape(0xbb08292b.toInt(), 100, true)
+        content.addView(area, FrameLayout.LayoutParams(-1, -1))
+        val heading = text("BERANDA  •  IING STD", 13f, aqua).apply {
+            gravity = Gravity.START or Gravity.CENTER_VERTICAL
             setTypeface(null, Typeface.BOLD)
         }
-        area.addView(widget, LinearLayout.LayoutParams(dp(235), dp(165)).apply { gravity = Gravity.CENTER_HORIZONTAL })
-        area.addView(View(this), LinearLayout.LayoutParams(-1, 0, 1f))
-        val title = text("APLIKASI FAVORIT", 12f, aqua).apply { gravity = Gravity.START or Gravity.CENTER_VERTICAL }
-        area.addView(title, LinearLayout.LayoutParams(-1, dp(36)))
-        val favorites = GridLayout(this).apply { columnCount = 4 }
-        area.addView(favorites)
-        val selected = apps.filter { app ->
-            listOf("shopee", "chatgpt", "chrome", "camera", "galeri", "setting", "youtube", "whatsapp").any {
-                app.name.contains(it, true) || app.pkg.contains(it, true)
+        area.addView(heading, LinearLayout.LayoutParams(-1, dp(40)))
+        val grid = GridLayout(this).apply { columnCount = columns }
+        area.addView(grid, LinearLayout.LayoutParams(-1, 0, 1f))
+        val perPage = columns * 4
+        val maxPage = ((apps.size.coerceAtLeast(1) - 1) / perPage)
+        page = page.coerceIn(0, maxPage)
+        val width = (resources.displayMetrics.widthPixels - dp(32)) / columns
+        apps.drop(page * perPage).take(perPage).forEach {
+            grid.addView(iconCell(it, width, dp(106)))
+        }
+        val indicator = LinearLayout(this).apply { gravity = Gravity.CENTER }
+        for (i in 0..maxPage.coerceAtMost(12)) {
+            val dot = View(this).apply {
+                background = shape(if (i == page) aqua else 0xff42605f.toInt(), 10)
+                setOnClickListener { page = i; render() }
             }
-        }.take(8).ifEmpty { apps.take(8) }
-        val width = (resources.displayMetrics.widthPixels - dp(32)) / 4
-        selected.forEach { favorites.addView(iconCell(it, width, dp(111))) }
-        area.addView(View(this), LinearLayout.LayoutParams(-1, dp(12)))
-        val hint = text("↑ Geser ke atas untuk semua aplikasi", 12f, muted)
+            indicator.addView(dot, LinearLayout.LayoutParams(dp(if (i == page) 19 else 7), dp(7)).apply {
+                setMargins(dp(4), dp(5), dp(4), dp(5))
+            })
+        }
+        area.addView(indicator, LinearLayout.LayoutParams(-1, dp(26)))
+        val hint = text("← Geser halaman →     •     ↑ Semua aplikasi", 12f, muted)
+        hint.setOnClickListener { drawer = true; page = 0; render() }
         area.addView(hint, LinearLayout.LayoutParams(-1, dp(35)))
-        area.setOnTouchListener(object : View.OnTouchListener {
-            override fun onTouch(v: View, e: MotionEvent): Boolean {
-                if (e.action == MotionEvent.ACTION_DOWN) { startY = e.y; return true }
-                if (e.action == MotionEvent.ACTION_UP && startY - e.y > dp(60)) { drawer = true; render(); return true }
-                return true
-            }
-        })
-        hint.setOnClickListener { drawer = true; render() }
     }
     private fun renderDrawer() {
         val area = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
@@ -291,7 +319,9 @@ class MainActivity : Activity() {
     }
     private fun renderPanel() {
         val area = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-        content.addView(area)
+        val scrollPanel = ScrollView(this)
+        scrollPanel.addView(area)
+        content.addView(scrollPanel)
         area.addView(text("PANEL TOSCA  •  KONTROL CEPAT", 16f, aqua), LinearLayout.LayoutParams(-1, dp(55)))
         val options = listOf("Wi-Fi" to Settings.ACTION_WIFI_SETTINGS,
             "Internet" to Settings.ACTION_WIRELESS_SETTINGS,
@@ -310,6 +340,11 @@ class MainActivity : Activity() {
                 row.addView(tile, LinearLayout.LayoutParams(0, dp(100), 1f).apply { setMargins(dp(4), dp(5), dp(4), dp(5)) })
             }
         }
+        val layoutSetting = text("TATA LETAK IKON   ${columns} KOLOM   •   UBAH", 15f, aqua).apply {
+            background = shape(0xff124441.toInt(), 18, true)
+            setOnClickListener { columns = if (columns == 4) 5 else if (columns == 5) 6 else 4; getPreferences(MODE_PRIVATE).edit().putInt("columns", columns).apply(); page = 0; render() }
+        }
+        area.addView(layoutSetting, LinearLayout.LayoutParams(-1, dp(65)).apply { topMargin = dp(10) })
         area.addView(text("Panel ini membuka pengaturan Android; tidak mengganti Quick Settings sistem.", 12f, muted),
             LinearLayout.LayoutParams(-1, dp(70)))
     }
