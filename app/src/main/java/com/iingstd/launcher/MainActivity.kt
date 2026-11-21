@@ -365,9 +365,19 @@ class MainActivity : Activity() {
         }
         cell.addView(ImageView(this).apply { setImageDrawable(app.icon) },
             LinearLayout.LayoutParams(dp(48), dp(48)))
-        cell.addView(text(app.name, 11f).apply {
+        val labelRow = FrameLayout(this)
+        labelRow.addView(text(app.name, 11f).apply {
             maxLines = 2; ellipsize = android.text.TextUtils.TruncateAt.END
-        }, LinearLayout.LayoutParams(-1, dp(39)).apply { topMargin = dp(5) })
+        }, FrameLayout.LayoutParams(-1, -1))
+        if (drawer) {
+            val options = text("⋮", 17f, aqua).apply {
+                contentDescription = "Opsi untuk ${app.name}"
+                isClickable = true
+                setOnClickListener { appMenu(app) }
+            }
+            labelRow.addView(options, FrameLayout.LayoutParams(dp(26), dp(39), Gravity.END or Gravity.TOP))
+        }
+        cell.addView(labelRow, LinearLayout.LayoutParams(-1, dp(39)).apply { topMargin = dp(5) })
         cell.setOnClickListener { try { startActivity(app.launch) } catch (_: Exception) { Toast.makeText(this, "Tidak dapat membuka ${app.name}", Toast.LENGTH_SHORT).show() } }
         cell.setOnLongClickListener {
             if (!panel) {
