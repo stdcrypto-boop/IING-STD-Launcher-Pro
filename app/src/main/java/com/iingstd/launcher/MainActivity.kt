@@ -24,6 +24,8 @@ import android.view.*
 import android.widget.*
 import java.text.SimpleDateFormat
 import java.util.*
+import org.json.JSONObject
+import org.json.JSONArray
 
 class MainActivity : Activity() {
     private val aqua = 0xff32e4c9.toInt()
@@ -55,6 +57,8 @@ class MainActivity : Activity() {
     private var showWallpaper = true
     private val favorites = linkedSetOf<String>()
     private var favoritesInitialized = false
+    private val folders = linkedMapOf<String, MutableList<String>>()
+    private val folderNames = linkedMapOf<String, String>()
     private lateinit var dockBar: LinearLayout
     private val tick = object : Runnable {
         override fun run() {
@@ -103,6 +107,7 @@ class MainActivity : Activity() {
         window.navigationBarColor = 0xff061a1d.toInt()
         columns = getPreferences(MODE_PRIVATE).getInt("columns", 4).coerceIn(4, 6)
         showWallpaper = getPreferences(MODE_PRIVATE).getBoolean("wallpaper", true)
+        loadFolders()
         favoritesInitialized = getPreferences(MODE_PRIVATE).contains("favorites_order")
         getPreferences(MODE_PRIVATE).getString("favorites_order", "")?.split("|")?.filter { it.isNotBlank() }?.forEach { favorites.add(it) }
         root = LinearLayout(this).apply {
@@ -244,6 +249,111 @@ class MainActivity : Activity() {
         }
         if (::dockBar.isInitialized) buildDock(dockBar)
     }
+    private fun loadFolders() {
+        try {
+            val data = JSONObject(getPreferences(MODE_PRIVATE).getString("folder_data", "{}") ?: "{}")
+            val keys = data.keys()
+            while (keys.hasNext()) {
+                val id = keys.next()
+                val entry = data.getJSONObject(id)
+                folderNames[id] = entry.optString("name", "Folder")
+                val items = entry.optJSONArray("apps") ?: JSONArray()
+                folders[id] = (0 until items.length()).map { items.getString(it) }.toMutableList()
+            }
+        } catch (_: Exception) { folders.clear(); folderNames.clear() }
+    }
+    private fun saveFolders() {
+        val data = JSONObject()
+        folders.forEach { (id, items) ->
+            data.put(id, JSONObject().put("name", folderNames[id] ?: "Folder")
+                .put("apps", JSONArray(items)))
+        }
+        getPreferences(MODE_PRIVATE).edit().putString("folder_data", data.toString()).apply()
+        saveFavorites()
+    }
+    private fun moveIntoFolder(source: String, target: String) {
+        if (source == target || !favorites.contains(source)) return
+        val id = if (target.startsWith("folder:")) target.removePrefix("folder:")
+                 else UUID.randomUUID().toString()
+        val list = folders.getOrPut(id) { mutableListOf() }
+        if (!target.startsWith("folder:")) {
+            if (!favorites.contains(target)) return
+            list.add(target)
+            favorites.remove(target)
+            folderNames[id] = "Folder Baru"
+            favorites.add("folder:$id")
+        }
+        if (!list.contains(source)) list.add(source)
+        favorites.remove(source)
+        saveFolders(); render()
+    }
+    private fun folderCell(id: String, width: Int, height: Int): LinearLayout {
+        val cell = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
+            setPadding(dp(3), dp(9), dp(3), dp(5))
+            isClickable = true
+        }
+        val preview = FrameLayout(this).apply {
+            background = shape(0xff124441.toInt(), 14, true)
+        }
+        val mini = GridLayout(this).apply { columnCount = 2 }
+        folders[id].orEmpty().take(4).forEach { pkg ->
+            apps.firstOrNull { it.pkg == pkg }?.let { app ->
+                mini.addView(ImageView(this).apply { setImageDrawable(app.icon) },
+                    GridLayout.LayoutParams().apply { width = dp(23); height = dp(23) })
+            }
+        }
+        preview.addView(mini, FrameLayout.LayoutParams(dp(46), dp(46), Gravity.CENTER))
+        cell.addView(preview, LinearLayout.LayoutParams(dp(50), dp(50)))
+        cell.addView(text(folderNames[id] ?: "Folder", 11f),
+            LinearLayout.LayoutParams(-1, dp(39)).apply { topMargin = dp(5) })
+        cell.setOnClickListener { showFolder(id) }
+        cell.setOnLongClickListener { renameFolder(id); true }
+        cell.setOnDragListener { _, event ->
+            when (event.action) {
+                DragEvent.ACTION_DRAG_STARTED -> event.clipDescription?.hasMimeType("text/plain") == true
+                DragEvent.ACTION_DRAG_ENTERED -> { cell.alpha = 0.6f; true }
+                DragEvent.ACTION_DRAG_EXITED, DragEvent.ACTION_DRAG_ENDED -> { cell.alpha = 1f; true }
+                DragEvent.ACTION_DROP -> {
+                    cell.alpha = 1f
+                    val source = event.localState as? String
+                    if (source != null) moveIntoFolder(source, "folder:$id")
+                    true
+                }
+                else -> true
+            }
+        }
+        cell.layoutParams = GridLayout.LayoutParams().apply { this.width = width; this.height = height }
+        return cell
+    }
+    private fun renameFolder(id: String) {
+        val field = EditText(this).apply { setText(folderNames[id] ?: "Folder") }
+        AlertDialog.Builder(this).setTitle("Nama folder").setView(field)
+            .setPositiveButton("Simpan") { _, _ ->
+                folderNames[id] = field.text.toString().trim().ifEmpty { "Folder" }
+                saveFolders(); render()
+            }.setNegativeButton("Batal", null).show()
+    }
+    private fun showFolder(id: String) {
+        val items = folders[id].orEmpty().mapNotNull { pkg -> apps.firstOrNull { it.pkg == pkg } }
+        val labels = items.map { it.name }.toTypedArray()
+        AlertDialog.Builder(this).setTitle(folderNames[id] ?: "Folder")
+            .setItems(labels) { _, index -> startActivity(items[index].launch) }
+            .setPositiveButton("Ubah nama") { _, _ -> renameFolder(id) }
+            .setNeutralButton("Kelola") { _, _ ->
+                AlertDialog.Builder(this).setTitle("Keluarkan aplikasi")
+                    .setItems(labels) { _, index ->
+                        val pkg = items[index].pkg
+                        folders[id]?.remove(pkg)
+                        favorites.add(pkg)
+                        if (folders[id].isNullOrEmpty()) {
+                            folders.remove(id); folderNames.remove(id); favorites.remove("folder:$id")
+                        }
+                        saveFolders(); render()
+                    }.setNegativeButton("Batal", null).show()
+            }.setNegativeButton("Tutup", null).show()
+    }
     private fun iconCell(app: App, width: Int, height: Int): LinearLayout {
         val cell = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL; gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
@@ -273,10 +383,7 @@ class MainActivity : Activity() {
                     cell.alpha = 1f
                     val source = event.localState as? String
                     if (source != null && source != app.pkg && favorites.contains(source)) {
-                        val order = favorites.toMutableList()
-                        order.remove(source)
-                        order.add(order.indexOf(app.pkg).coerceAtLeast(0), source)
-                        favorites.clear(); favorites.addAll(order); saveFavorites(); render()
+                        moveIntoFolder(source, app.pkg)
                     }
                     true
                 }
@@ -357,12 +464,13 @@ class MainActivity : Activity() {
         val homeScroll = ScrollView(this).apply { isFillViewport = true; addView(grid) }
         area.addView(homeScroll, LinearLayout.LayoutParams(-1, 0, 1f))
         val perPage = columns * 4
-        val homeApps = favorites.mapNotNull { pkg -> apps.firstOrNull { it.pkg == pkg } }
-        val maxPage = ((homeApps.size.coerceAtLeast(1) - 1) / perPage)
+        val homeItems = favorites.toList()
+        val maxPage = ((homeItems.size.coerceAtLeast(1) - 1) / perPage)
         page = page.coerceIn(0, maxPage)
         val width = (resources.displayMetrics.widthPixels - dp(32)) / columns
-        homeApps.drop(page * perPage).take(perPage).forEach {
-            grid.addView(iconCell(it, width, dp(106)))
+        homeItems.drop(page * perPage).take(perPage).forEach { key ->
+            if (key.startsWith("folder:")) grid.addView(folderCell(key.removePrefix("folder:"), width, dp(106)))
+            else apps.firstOrNull { it.pkg == key }?.let { grid.addView(iconCell(it, width, dp(106))) }
         }
         val indicator = LinearLayout(this).apply { gravity = Gravity.CENTER }
         for (i in 0..maxPage.coerceAtMost(12)) {
