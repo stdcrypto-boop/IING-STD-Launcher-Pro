@@ -9,6 +9,10 @@ import android.content.*
 import android.graphics.Color
 import android.graphics.Canvas
 import android.graphics.Paint
+import android.graphics.Path
+import android.graphics.BitmapFactory
+import android.graphics.Bitmap
+import android.graphics.RectF
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.net.ConnectivityManager
@@ -55,6 +59,7 @@ class MainActivity : Activity() {
     private var gestureX = 0f
     private var gestureY = 0f
     private var showWallpaper = true
+    private var signaturePhoto: Bitmap? = null
     private val favorites = linkedSetOf<String>()
     private val drawerOrder = mutableListOf<String>()
     private var favoritesInitialized = false
@@ -109,6 +114,7 @@ class MainActivity : Activity() {
         columns = getPreferences(MODE_PRIVATE).getInt("columns", 4).coerceIn(4, 6)
         showWallpaper = getPreferences(MODE_PRIVATE).getBoolean("wallpaper", true)
         drawerOrder.addAll(getPreferences(MODE_PRIVATE).getString("drawer_order", "")?.split("|")?.filter { it.isNotBlank() } ?: emptyList())
+        loadSignaturePhoto()
         loadFolders()
         favoritesInitialized = getPreferences(MODE_PRIVATE).contains("favorites_order")
         getPreferences(MODE_PRIVATE).getString("favorites_order", "")?.split("|")?.filter { it.isNotBlank() }?.forEach { favorites.add(it) }
@@ -417,20 +423,86 @@ class MainActivity : Activity() {
         apps.sortBy { drawerOrder.indexOf(it.pkg).let { pos -> if (pos < 0) Int.MAX_VALUE else pos } }
         render()
     }
+    private fun loadSignaturePhoto() {
+        val saved = getPreferences(MODE_PRIVATE).getString("signature_photo", null) ?: return
+        try {
+            contentResolver.openInputStream(Uri.parse(saved))?.use { stream ->
+                signaturePhoto = BitmapFactory.decodeStream(stream)
+            }
+        } catch (_: Exception) { signaturePhoto = null }
+    }
+    private inner class HeartPhoto(context: Context) : View(context) {
+        private val brush = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
+        override fun onDraw(canvas: Canvas) {
+            val bmp = signaturePhoto ?: return
+            val w = width.toFloat()
+            val h = height.toFloat()
+            val heart = Path().apply {
+                moveTo(w / 2f, h * 0.92f)
+                cubicTo(w * -0.12f, h * 0.48f, w * 0.05f, h * 0.05f, w * 0.28f, h * 0.08f)
+                cubicTo(w * 0.43f, h * 0.07f, w * 0.50f, h * 0.23f, w / 2f, h * 0.25f)
+                cubicTo(w * 0.60f, h * 0.04f, w * 0.84f, h * 0.03f, w * 0.95f, h * 0.20f)
+                cubicTo(w * 1.16f, h * 0.53f, w * 0.72f, h * 0.83f, w / 2f, h * 0.92f)
+                close()
+            }
+            canvas.save()
+            canvas.clipPath(heart)
+            val scale = minOf(w / bmp.width, h / bmp.height)
+            val drawWidth = bmp.width * scale
+            val drawHeight = bmp.height * scale
+            val left = (w - drawWidth) / 2f
+            val top = (h - drawHeight) / 2f
+            brush.color = Color.WHITE
+            canvas.drawBitmap(bmp, null, RectF(left, top, left + drawWidth, top + drawHeight), brush)
+            canvas.restore()
+            brush.style = Paint.Style.STROKE
+            brush.strokeWidth = dp(2).toFloat()
+            brush.color = aqua
+            canvas.drawPath(heart, brush)
+            brush.style = Paint.Style.FILL
+        }
+    }
+    private fun chooseSignaturePhoto() {
+        try {
+            startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+                addCategory(Intent.CATEGORY_OPENABLE)
+                type = "image/*"
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION)
+            }, 612)
+        } catch (_: Exception) { Toast.makeText(this, "Pemilih foto tidak tersedia", Toast.LENGTH_SHORT).show() }
+    }
+    @Deprecated("Deprecated in Java")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == 612 && resultCode == RESULT_OK) {
+            val uri = data?.data ?: return
+            try {
+                contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                getPreferences(MODE_PRIVATE).edit().putString("signature_photo", uri.toString()).apply()
+                loadSignaturePhoto()
+                render()
+            } catch (_: Exception) { Toast.makeText(this, "Foto tidak dapat dibaca", Toast.LENGTH_SHORT).show() }
+        }
+    }
     private fun addSignatureWatermark() {
-        val signature = TextView(this).apply {
-            text = "IING SUTADI"
-            textSize = 38f
-            setTextColor(aqua)
-            setTypeface(Typeface.create("cursive", Typeface.ITALIC))
+        val group = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER
-            alpha = 0.30f
             isClickable = false
-            isLongClickable = false
             isFocusable = false
             importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
         }
-        content.addView(signature, FrameLayout.LayoutParams(-1, dp(100), Gravity.CENTER))
+        if (signaturePhoto != null) {
+            group.addView(HeartPhoto(this).apply { isClickable = false },
+                LinearLayout.LayoutParams(dp(112), dp(106)))
+        }
+        group.addView(text("IING SUTADI", 35f, aqua).apply {
+            setTypeface(Typeface.create("cursive", Typeface.ITALIC))
+            alpha = 0.38f
+            isClickable = false
+            isFocusable = false
+        }, LinearLayout.LayoutParams(-1, dp(60)))
+        content.addView(group, FrameLayout.LayoutParams(-1, dp(176), Gravity.CENTER))
     }
     private fun saveFavorites() {
         favoritesInitialized = true
@@ -606,6 +678,11 @@ class MainActivity : Activity() {
             }
         }
         area.addView(wallpaperSetting, LinearLayout.LayoutParams(-1, dp(65)).apply { topMargin = dp(10) })
+        val photoSetting = text("FOTO HATI IING SUTADI  •  PILIH FOTO", 15f, aqua).apply {
+            background = shape(0xff124441.toInt(), 18, true)
+            setOnClickListener { chooseSignaturePhoto() }
+        }
+        area.addView(photoSetting, LinearLayout.LayoutParams(-1, dp(65)).apply { topMargin = dp(10) })
         val defaultSetting = text("JADIKAN LAUNCHER UTAMA  ⌂", 15f, aqua).apply {
             background = shape(0xff124441.toInt(), 18, true)
             setOnClickListener { requestDefaultHome() }
