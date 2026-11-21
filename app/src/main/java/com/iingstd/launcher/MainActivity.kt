@@ -578,7 +578,7 @@ class MainActivity : Activity() {
                     val source = event.localState as? String
                     if (source != null && source != app.pkg) {
                         if (drawer) reorderDrawer(source, app.pkg)
-                        else if (favorites.contains(source)) moveIntoFolder(source, app.pkg)
+                        else if (favorites.contains(source)) showHomeDropOptions(source, app.pkg)
                     }
                     true
                 }
@@ -587,6 +587,29 @@ class MainActivity : Activity() {
         }
         cell.layoutParams = GridLayout.LayoutParams().apply { this.width = width; this.height = height }
         return cell
+    }
+    private fun showHomeDropOptions(source: String, target: String) {
+        if (source == target || !favorites.contains(source) || !favorites.contains(target)) return
+        val sourceName = apps.firstOrNull { it.pkg == source }?.name ?: "Aplikasi"
+        val targetName = apps.firstOrNull { it.pkg == target }?.name ?: "Aplikasi"
+        AlertDialog.Builder(this).setTitle("Pindahkan " + sourceName)
+            .setItems(arrayOf("Pindah sebelum " + targetName, "Pindah setelah " + targetName, "Gabungkan menjadi folder")) { _, choice ->
+                if (choice == 2) {
+                    moveIntoFolder(source, target)
+                } else {
+                    val order = favorites.toMutableList()
+                    order.remove(source)
+                    val index = order.indexOf(target)
+                    if (index >= 0) {
+                        order.add((index + if (choice == 1) 1 else 0).coerceAtMost(order.size), source)
+                        favorites.clear()
+                        favorites.addAll(order)
+                        saveFavorites()
+                        page = 0
+                        render()
+                    }
+                }
+            }.setNegativeButton("Batal", null).show()
     }
     private fun reorderDrawer(source: String, target: String) {
         val order = apps.map { it.pkg }.toMutableList()
@@ -964,7 +987,7 @@ class MainActivity : Activity() {
         }
         prev.setOnClickListener { page--; redraw() }
         next.setOnClickListener { page++; redraw() }
-        layout.setOnClickListener { columns = if (columns == 4) 5 else if (columns == 5) 6 else 4; grid.columnCount = columns; page = 0; redraw() }
+        layout.setOnClickListener { columns = if (columns == 4) 5 else if (columns == 5) 6 else 4; getPreferences(MODE_PRIVATE).edit().putInt("columns", columns).apply(); grid.columnCount = columns; page = 0; redraw() }
         search.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) { drawerQuery = s?.toString() ?: ""; page = 0; redraw() }
