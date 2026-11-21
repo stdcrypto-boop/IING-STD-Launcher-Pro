@@ -29,6 +29,7 @@ import android.provider.Settings
 import android.text.Editable
 import android.text.TextWatcher
 import android.view.*
+import android.view.animation.PathInterpolator
 import android.widget.*
 import java.text.SimpleDateFormat
 import java.util.*
@@ -120,6 +121,8 @@ class MainActivity : Activity() {
     private var twoFingerPanel = true
     private var touchPointerCount = 0
     private var gestureStartedInWorkspace = false
+    private var nextPageDirection = 0
+    private var lastRenderedSection = ""
     private val hiddenApps = linkedSetOf<String>()
     private val favorites = linkedSetOf<String>()
     private val drawerOrder = mutableListOf<String>()
@@ -359,6 +362,7 @@ class MainActivity : Activity() {
             // Only the workspace handles paging gestures; keep the system bars and dock untouched.
             val inWorkspace = gestureStartedInWorkspace
             if (inWorkspace && kotlin.math.abs(dx) > dp(65) && kotlin.math.abs(dx) > kotlin.math.abs(dy) * 1.3f) {
+                nextPageDirection = if (dx < 0) 1 else -1
                 if (drawer) {
                     val matches = apps.count { it.pkg !in hiddenApps && it.name.contains(drawerQuery, true) }
                     val max = ((matches.coerceAtLeast(1) - 1) / (columns * 5))
@@ -1039,11 +1043,38 @@ class MainActivity : Activity() {
         }
     }
     private fun render() {
+        val section = when {
+            panel -> "panel"
+            drawer -> "drawer"
+            else -> "home"
+        }
+        val sectionChanged = section != lastRenderedSection
+        val direction = nextPageDirection
+        nextPageDirection = 0
+        // Remove stale views before building the next page; animate only the new content.
+        content.animate().cancel()
         content.removeAllViews()
-        when {
-            panel -> renderPanel()
-            drawer -> renderDrawer()
+        when (section) {
+            "panel" -> renderPanel()
+            "drawer" -> renderDrawer()
             else -> renderHome()
+        }
+        lastRenderedSection = section
+        if (sectionChanged || direction != 0) {
+            val distance = dp(if (sectionChanged) 24 else 48).toFloat()
+            val startX = if (direction == 0) 0f else if (direction > 0) distance else -distance
+            content.alpha = 0.35f
+            content.translationX = startX
+            content.translationY = if (sectionChanged) dp(12).toFloat() else 0f
+            content.animate()
+                .alpha(1f).translationX(0f).translationY(0f)
+                .setDuration(if (sectionChanged) 420L else 520L)
+                .setInterpolator(PathInterpolator(0.22f, 1f, 0.36f, 1f))
+                .start()
+        } else {
+            content.alpha = 1f
+            content.translationX = 0f
+            content.translationY = 0f
         }
     }
     private fun renderHome() {
