@@ -94,7 +94,7 @@ class MainActivity : Activity() {
         telephonyListening = false
         cellularBarsAvailable = false
     }
-    private lateinit var battery: TextView
+    private lateinit var battery: BulbBatteryView
     private lateinit var speed: TextView
     private lateinit var content: FrameLayout
     private var drawer = false
@@ -146,19 +146,43 @@ class MainActivity : Activity() {
         val scale = intent?.getIntExtra(BatteryManager.EXTRA_SCALE, 100) ?: 100
         val status = intent?.getIntExtra(BatteryManager.EXTRA_STATUS, -1) ?: -1
         val percent = if (level >= 0 && scale > 0) level * 100 / scale else -1
-        val indicator = when (status) {
-            BatteryManager.BATTERY_STATUS_CHARGING -> "⚡"
-            BatteryManager.BATTERY_STATUS_FULL -> "✓"
-            else -> "▰"
-        }
         if (::battery.isInitialized) {
-            val label = if (percent >= 0) "$indicator $percent%" else "$indicator --"
-            if (battery.text.toString() != label) battery.text = label
+            battery.percent = percent
+            battery.charging = status == BatteryManager.BATTERY_STATUS_CHARGING
+            battery.invalidate()
             battery.contentDescription = when (status) {
                 BatteryManager.BATTERY_STATUS_CHARGING -> "Baterai $percent persen, sedang mengisi"
                 BatteryManager.BATTERY_STATUS_FULL -> "Baterai penuh"
                 else -> "Baterai $percent persen"
             }
+        }
+    }
+    private inner class BulbBatteryView(context: Context) : View(context) {
+        var percent: Int = -1
+        var charging: Boolean = false
+        private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+        override fun onDraw(canvas: Canvas) {
+            super.onDraw(canvas)
+            val scale = minOf(width / 62f, height / 54f)
+            canvas.save()
+            canvas.translate((width - 62f * scale) / 2f, (height - 54f * scale) / 2f)
+            canvas.scale(scale, scale)
+            paint.color = Color.WHITE
+            paint.style = Paint.Style.FILL
+            canvas.drawCircle(31f, 20f, 18f, paint)
+            canvas.drawRoundRect(23f, 31f, 39f, 42f, 3f, 3f, paint)
+            canvas.drawRoundRect(25f, 43f, 37f, 47f, 2f, 2f, paint)
+            paint.color = 0xff263342.toInt()
+            paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+            paint.textAlign = Paint.Align.CENTER
+            paint.textSize = 14f
+            canvas.drawText(if (percent >= 0) percent.toString() else "--", 31f, 25f, paint)
+            if (charging) {
+                paint.color = aqua
+                paint.textSize = 12f
+                canvas.drawText("+", 49f, 12f, paint)
+            }
+            canvas.restore()
         }
     }
     private val receiver = object : BroadcastReceiver() {
@@ -269,8 +293,8 @@ class MainActivity : Activity() {
         status.addView(network, LinearLayout.LayoutParams(0, dp(40), 1f))
         speed = text("↓ -- KB/s", 12f, muted)
         status.addView(speed, LinearLayout.LayoutParams(0, dp(38), 1f))
-        battery = text("BAT --", 16f, aqua)
-        status.addView(battery)
+        battery = BulbBatteryView(this).apply { contentDescription = "Status baterai" }
+        status.addView(battery, LinearLayout.LayoutParams(dp(58), dp(48)))
         root.addView(status)
         val clockRow = LinearLayout(this).apply { gravity = Gravity.CENTER; orientation = LinearLayout.HORIZONTAL }
         val roosterLeft = FrontRooster(this).apply { contentDescription = "Ayam menghadap depan kiri" }
