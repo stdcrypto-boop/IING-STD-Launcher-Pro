@@ -23,7 +23,7 @@ import java.util.Date
 import java.util.Locale
 
 class MainActivity : Activity() {
-    private val accent = Color.rgb(56, 233, 255)
+    private val accent = Color.rgb(43, 226, 197)
     private val handler = Handler(Looper.getMainLooper())
     private lateinit var clock: TextView
     private lateinit var date: TextView
@@ -56,21 +56,24 @@ class MainActivity : Activity() {
     }
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        window.statusBarColor = Color.rgb(7, 12, 25)
-        window.navigationBarColor = Color.rgb(7, 12, 25)
+        window.statusBarColor = Color.rgb(5, 25, 28)
+        window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_FULLSCREEN
+        window.navigationBarColor = Color.rgb(5, 25, 28)
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(dp(16), dp(20), dp(16), dp(10))
+            setPadding(dp(18), dp(18), dp(18), dp(12))
             background = GradientDrawable(GradientDrawable.Orientation.TL_BR,
-                intArrayOf(0xff070c19.toInt(), 0xff102b3c.toInt(), 0xff070c19.toInt()))
+                intArrayOf(0xff061619.toInt(), 0xff0d3435.toInt(), 0xff061619.toInt()))
         }
         setContentView(root)
         val top = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
+        val signal = label("◢  5G  •  Wi-Fi", 13f, accent)
+        top.addView(signal, LinearLayout.LayoutParams(0, dp(38), 1f))
         val brand = label("IING STD  /  LAUNCHER", 15f, accent).apply {
             gravity = Gravity.START or Gravity.CENTER_VERTICAL
             setTypeface(null, Typeface.BOLD)
         }
-        top.addView(brand, LinearLayout.LayoutParams(0, dp(38), 1f))
+        root.addView(brand, LinearLayout.LayoutParams(-1, dp(34)))
         battery = label("BAT --", 14f, accent)
         top.addView(battery)
         root.addView(top)
@@ -78,7 +81,9 @@ class MainActivity : Activity() {
         root.addView(clock, LinearLayout.LayoutParams(-1, dp(75)))
         date = label("", 14f, 0xffb5c7d5.toInt())
         root.addView(date, LinearLayout.LayoutParams(-1, dp(28)))
-        val divider = View(this).apply { setBackgroundColor(0x5538e9ff) }
+        val subtitle = label("YOUR SPACE  •  YOUR STYLE", 11f, accent)
+        root.addView(subtitle, LinearLayout.LayoutParams(-1, dp(30)))
+        val divider = View(this).apply { setBackgroundColor(0x552be2c5) }
         root.addView(divider, LinearLayout.LayoutParams(-1, dp(1)).apply { topMargin = dp(16); bottomMargin = dp(14) })
         search = EditText(this).apply {
             hint = "⌕  Cari aplikasi..."
@@ -98,6 +103,15 @@ class MainActivity : Activity() {
         grid = GridLayout(this).apply { columnCount = 4 }
         scroll.addView(grid)
         root.addView(scroll, LinearLayout.LayoutParams(-1, 0, 1f))
+        val dock = label("⌂   BERANDA     •     IING STD LAUNCHER PRO", 12f, accent).apply {
+            setTypeface(null, Typeface.BOLD)
+            background = GradientDrawable().apply {
+                setColor(0xff103a39.toInt())
+                cornerRadius = dp(20).toFloat()
+                setStroke(dp(1), accent)
+            }
+        }
+        root.addView(dock, LinearLayout.LayoutParams(-1, dp(46)))
         search.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) = renderApps(s.toString())
