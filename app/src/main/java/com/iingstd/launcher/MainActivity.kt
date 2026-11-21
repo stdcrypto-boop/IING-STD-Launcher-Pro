@@ -475,7 +475,7 @@ class MainActivity : Activity() {
         cell.addView(text(folderNames[id] ?: "Folder", 11f),
             LinearLayout.LayoutParams(-1, dp(39)).apply { topMargin = dp(5) })
         cell.setOnClickListener { showFolder(id) }
-        cell.setOnLongClickListener { renameFolder(id); true }
+        cell.setOnLongClickListener { showFolderActions(id); true }
         cell.setOnDragListener { _, event ->
             when (event.action) {
                 DragEvent.ACTION_DRAG_STARTED -> event.clipDescription?.hasMimeType("text/plain") == true
@@ -500,6 +500,26 @@ class MainActivity : Activity() {
                 folderNames[id] = field.text.toString().trim().ifEmpty { "Folder" }
                 saveFolders(); render()
             }.setNegativeButton("Batal", null).show()
+    }
+    private fun showFolderActions(id: String) {
+        val choices = arrayOf("Buka folder", "Ubah nama", "Hapus folder")
+        AlertDialog.Builder(this).setTitle(folderNames[id] ?: "Folder")
+            .setItems(choices) { _, selected ->
+                when (selected) {
+                    0 -> showFolder(id)
+                    1 -> renameFolder(id)
+                    2 -> AlertDialog.Builder(this).setTitle("Hapus folder?")
+                        .setMessage("Aplikasi di dalam folder akan dikembalikan ke beranda.")
+                        .setPositiveButton("Hapus") { _, _ ->
+                            val members = folders.remove(id).orEmpty()
+                            folderNames.remove(id)
+                            favorites.remove("folder:$id")
+                            members.forEach { favorites.add(it) }
+                            saveFolders()
+                            render()
+                        }.setNegativeButton("Batal", null).show()
+                }
+            }.show()
     }
     private fun showFolder(id: String) {
         val items = folders[id].orEmpty().mapNotNull { pkg -> apps.firstOrNull { it.pkg == pkg } }
