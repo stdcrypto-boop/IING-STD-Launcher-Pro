@@ -52,7 +52,7 @@ class DecorationService : Service() {
         group.addView(object : View(this) {
             private val paint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
             override fun onDraw(canvas: Canvas) {
-                val bitmap = photo ?: return
+                val bitmap = photo
                 val w = width.toFloat(); val h = height.toFloat()
                 val heart = Path().apply {
                     moveTo(w / 2, h * .93f)
@@ -62,34 +62,39 @@ class DecorationService : Service() {
                     cubicTo(w * 1.16f, h * .53f, w * .72f, h * .83f, w / 2, h * .93f)
                     close()
                 }
-                canvas.save(); canvas.clipPath(heart)
-                val scale = maxOf(w / bitmap.width, h / bitmap.height)
-                val dw = bitmap.width * scale; val dh = bitmap.height * scale
-                canvas.drawBitmap(bitmap, null, RectF((w-dw)/2, (h-dh)/2, (w+dw)/2, (h+dh)/2), paint)
-                canvas.restore()
+                if (bitmap != null) {
+                    canvas.save(); canvas.clipPath(heart)
+                    val scale = maxOf(w / bitmap.width, h / bitmap.height)
+                    val dw = bitmap.width * scale; val dh = bitmap.height * scale
+                    canvas.drawBitmap(bitmap, null, RectF((w-dw)/2, (h-dh)/2, (w+dw)/2, (h+dh)/2), paint)
+                    canvas.restore()
+                } else {
+                    paint.color = 0xffff69b4.toInt()
+                    canvas.drawPath(heart, paint)
+                }
                 paint.style = Paint.Style.STROKE
                 paint.strokeWidth = dp(2).toFloat()
-                paint.color = 0xff32e4c9.toInt()
+                paint.color = 0xffff80c0.toInt()
                 canvas.drawPath(heart, paint)
                 paint.style = Paint.Style.FILL
             }
-        }, LinearLayout.LayoutParams(dp(140), dp(140)))
+        }, LinearLayout.LayoutParams(dp(110), dp(110)))
         group.addView(TextView(this).apply {
-            text = "IING SUTADI"
-            textSize = 30f
+            text = "IING & ADELIA"
+            textSize = 17f
             setTextColor(0xff32e4c9.toInt())
             typeface = Typeface.create("cursive", Typeface.ITALIC)
             gravity = Gravity.CENTER
             alpha = .90f
-        }, LinearLayout.LayoutParams(-1, dp(55)))
+        }, LinearLayout.LayoutParams(-1, dp(35)))
         val flags = WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
             WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
             WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
             WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN
-        val params = WindowManager.LayoutParams(dp(280), dp(210),
+        val params = WindowManager.LayoutParams(dp(150), dp(165),
             WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY, flags, PixelFormat.TRANSLUCENT).apply {
             gravity = Gravity.CENTER
-            alpha = 0.22f
+            alpha = 0.88f
         }
         try {
             windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
