@@ -51,6 +51,7 @@ class MainActivity : Activity() {
     private var gestureY = 0f
     private var showWallpaper = true
     private val favorites = linkedSetOf<String>()
+    private var favoritesInitialized = false
     private lateinit var dockBar: LinearLayout
     private val tick = object : Runnable {
         override fun run() {
@@ -99,7 +100,8 @@ class MainActivity : Activity() {
         window.navigationBarColor = 0xff061a1d.toInt()
         columns = getPreferences(MODE_PRIVATE).getInt("columns", 4).coerceIn(4, 6)
         showWallpaper = getPreferences(MODE_PRIVATE).getBoolean("wallpaper", true)
-        favorites.addAll(getPreferences(MODE_PRIVATE).getStringSet("favorites", emptySet()) ?: emptySet())
+        favoritesInitialized = getPreferences(MODE_PRIVATE).contains("favorites_order")
+        getPreferences(MODE_PRIVATE).getString("favorites_order", "")?.split("|")?.filter { it.isNotBlank() }?.forEach { favorites.add(it) }
         root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(16), dp(8), dp(16), dp(12))
@@ -222,7 +224,7 @@ class MainActivity : Activity() {
             apps.add(App(info.loadLabel(packageManager).toString(), pkg, launch, info.loadIcon(packageManager)))
         }
         apps.sortBy { it.name.lowercase(Locale.getDefault()) }
-        if (favorites.isEmpty()) {
+        if (!favoritesInitialized) {
             apps.filter { app -> listOf("camera", "chrome", "whatsapp", "setting", "phone", "message").any { app.name.contains(it, true) || app.pkg.contains(it, true) } }
                 .take(8).forEach { favorites.add(it.pkg) }
             saveFavorites()
@@ -247,17 +249,19 @@ class MainActivity : Activity() {
         return cell
     }
     private fun saveFavorites() {
-        getPreferences(MODE_PRIVATE).edit().putStringSet("favorites", favorites.toSet()).apply()
+        favoritesInitialized = true
+        getPreferences(MODE_PRIVATE).edit().putString("favorites_order", favorites.joinToString("|")).apply()
     }
     private fun appMenu(app: App) {
         AlertDialog.Builder(this).setTitle(app.name)
-            .setItems(arrayOf("Buka", if (favorites.contains(app.pkg)) "Hapus dari beranda" else "Tambahkan ke beranda", "Info aplikasi", "Uninstall")) { _, option ->
+            .setItems(arrayOf("Buka", if (favorites.contains(app.pkg)) "Hapus dari beranda" else "Tambahkan ke beranda", "Pindahkan ikon ke awal", "Info aplikasi", "Uninstall")) { _, option ->
                 try {
                     when (option) {
                         0 -> startActivity(app.launch)
                         1 -> { if (!favorites.add(app.pkg)) favorites.remove(app.pkg); saveFavorites(); render() }
-                        2 -> startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${app.pkg}")))
-                        3 -> startActivity(Intent(Intent.ACTION_DELETE, Uri.parse("package:${app.pkg}")))
+                        2 -> { favorites.remove(app.pkg); val old = favorites.toList(); favorites.clear(); favorites.add(app.pkg); favorites.addAll(old); saveFavorites(); page = 0; render() }
+                        3 -> startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${app.pkg}")))
+                        4 -> startActivity(Intent(Intent.ACTION_DELETE, Uri.parse("package:${app.pkg}")))
                     }
                 } catch (_: Exception) { Toast.makeText(this, "Tindakan tidak tersedia", Toast.LENGTH_SHORT).show() }
             }.show()
@@ -274,6 +278,7 @@ class MainActivity : Activity() {
                 image.setOnLongClickListener { appMenu(app); true }
             } else {
                 image.setImageResource(android.R.drawable.ic_menu_help)
+                image.alpha = 0.3f
             }
             image.setPadding(dp(10), dp(10), dp(10), dp(10))
             dock.addView(image, LinearLayout.LayoutParams(0, dp(64), 1f))
@@ -296,9 +301,10 @@ class MainActivity : Activity() {
         }
         area.addView(heading, LinearLayout.LayoutParams(-1, dp(40)))
         val grid = GridLayout(this).apply { columnCount = columns }
-        area.addView(grid, LinearLayout.LayoutParams(-1, 0, 1f))
+        val homeScroll = ScrollView(this).apply { isFillViewport = true; addView(grid) }
+        area.addView(homeScroll, LinearLayout.LayoutParams(-1, 0, 1f))
         val perPage = columns * 4
-        val homeApps = apps.filter { favorites.contains(it.pkg) }
+        val homeApps = favorites.mapNotNull { pkg -> apps.firstOrNull { it.pkg == pkg } }
         val maxPage = ((homeApps.size.coerceAtLeast(1) - 1) / perPage)
         page = page.coerceIn(0, maxPage)
         val width = (resources.displayMetrics.widthPixels - dp(32)) / columns
