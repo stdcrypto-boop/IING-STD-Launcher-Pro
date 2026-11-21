@@ -735,24 +735,77 @@ class MainActivity : Activity() {
     }
     private fun showAddToHomePicker() {
         val available = apps.filter { !favorites.contains(it.pkg) && folders.values.none { members -> it.pkg in members } }
+            .sortedBy { it.name.lowercase(Locale.getDefault()) }
         if (available.isEmpty()) {
             Toast.makeText(this, "Semua aplikasi sudah ada di beranda atau folder", Toast.LENGTH_SHORT).show()
             return
         }
-        val selected = BooleanArray(available.size)
-        AlertDialog.Builder(this)
-            .setTitle("Pilih aplikasi untuk beranda")
-            .setMultiChoiceItems(available.map { it.name }.toTypedArray(), selected) { _, index, checked ->
-                selected[index] = checked
+        val selectedPackages = mutableSetOf<String>()
+        val filtered = available.toMutableList()
+        val container = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(12), dp(6), dp(12), dp(4))
+        }
+        val search = EditText(this).apply {
+            hint = "Cari aplikasi..."
+            setSingleLine(true)
+            setPadding(dp(12), dp(8), dp(12), dp(8))
+        }
+        container.addView(search, LinearLayout.LayoutParams(-1, dp(52)))
+        val list = ListView(this).apply { dividerHeight = dp(1); choiceMode = ListView.CHOICE_MODE_NONE }
+        container.addView(list, LinearLayout.LayoutParams(-1, dp(440)))
+        val adapter = object : ArrayAdapter<App>(this, android.R.layout.simple_list_item_1, filtered) {
+            override fun getView(position: Int, convertView: View?, parent: android.view.ViewGroup): View {
+                val app = getItem(position)!!
+                val row = LinearLayout(this@MainActivity).apply {
+                    orientation = LinearLayout.HORIZONTAL
+                    gravity = Gravity.CENTER_VERTICAL
+                    setPadding(dp(12), dp(7), dp(12), dp(7))
+                    minimumHeight = dp(60)
+                }
+                row.addView(CheckBox(this@MainActivity).apply {
+                    isChecked = selectedPackages.contains(app.pkg)
+                    isClickable = false
+                    isFocusable = false
+                    buttonTintList = android.content.res.ColorStateList.valueOf(aqua)
+                }, LinearLayout.LayoutParams(dp(40), dp(44)))
+                row.addView(ImageView(this@MainActivity).apply {
+                    setImageDrawable(app.icon)
+                    contentDescription = "Logo " + app.name
+                }, LinearLayout.LayoutParams(dp(42), dp(42)))
+                row.addView(TextView(this@MainActivity).apply {
+                    text = app.name
+                    textSize = 16f
+                    setTextColor(Color.WHITE)
+                    maxLines = 2
+                    ellipsize = android.text.TextUtils.TruncateAt.END
+                }, LinearLayout.LayoutParams(0, -2, 1f).apply { marginStart = dp(14) })
+                return row
             }
+        }
+        list.adapter = adapter
+        list.setOnItemClickListener { _, _, position, _ ->
+            val pkg = filtered[position].pkg
+            if (!selectedPackages.add(pkg)) selectedPackages.remove(pkg)
+            adapter.notifyDataSetChanged()
+        }
+        search.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+                filtered.clear()
+                filtered.addAll(available.filter { it.name.contains(s?.toString().orEmpty(), true) })
+                adapter.notifyDataSetChanged()
+            }
+            override fun afterTextChanged(s: Editable?) {}
+        })
+        AlertDialog.Builder(this).setTitle("Pilih aplikasi untuk beranda")
+            .setView(container)
             .setPositiveButton("Tambahkan") { _, _ ->
-                available.forEachIndexed { index, app -> if (selected[index]) favorites.add(app.pkg) }
+                selectedPackages.forEach { favorites.add(it) }
                 saveFavorites()
-                Toast.makeText(this, "Aplikasi ditambahkan ke beranda", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, "${selectedPackages.size} aplikasi ditambahkan ke beranda", Toast.LENGTH_SHORT).show()
                 render()
-            }
-            .setNegativeButton("Batal", null)
-            .show()
+            }.setNegativeButton("Batal", null).show()
     }
     private fun appMenu(app: App) {
         AlertDialog.Builder(this).setTitle(app.name)
