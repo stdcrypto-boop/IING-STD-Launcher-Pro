@@ -772,7 +772,15 @@ class MainActivity : Activity() {
                     }
                 } else {
                     val id = folders.keys.elementAt(index - 1)
-                    folders[id]?.remove(app.pkg)
+                    folders.forEach { (otherId, members) ->
+                        if (otherId != id) members.remove(app.pkg)
+                    }
+                    val emptyIds = folders.filterValues { it.isEmpty() }.keys.toList()
+                    emptyIds.forEach { emptyId ->
+                        folders.remove(emptyId)
+                        folderNames.remove(emptyId)
+                        favorites.remove("folder:" + emptyId)
+                    }
                     if (folders[id]?.contains(app.pkg) != true) folders[id]?.add(app.pkg)
                     favorites.remove(app.pkg)
                     saveFolders(); render()
