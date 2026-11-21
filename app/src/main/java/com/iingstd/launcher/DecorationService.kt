@@ -1,6 +1,8 @@
 package com.iingstd.launcher
 
 import android.app.*
+import android.appwidget.AppWidgetManager
+import android.content.ComponentName
 import android.content.*
 import android.graphics.*
 import android.net.Uri
@@ -31,11 +33,11 @@ class DecorationService : Service() {
             .setContentText("Foto dan tanda tangan tampil • ketuk Sembunyikan untuk mematikan")
             .addAction(android.R.drawable.ic_menu_close_clear_cancel, "Sembunyikan", stopIntent)
         startForeground(21, notification.build())
-        showDecoration()
+        // No global overlay: it would cover other apps. Use the home widget instead.
     }
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent?.action == "STOP") { stopSelf(); return START_NOT_STICKY }
-        if (overlay == null) showDecoration()
+        // Overlay deliberately disabled; home-only decoration is provided by a widget.
         return START_NOT_STICKY
     }
     private fun showDecoration() {
