@@ -60,6 +60,10 @@ class MainActivity : Activity() {
     private var gestureY = 0f
     private var showWallpaper = true
     private var signaturePhoto: Bitmap? = null
+    private var iconSize = 48
+    private var heartSize = 112
+    private var heartOpacity = 100
+    private val hiddenApps = linkedSetOf<String>()
     private val favorites = linkedSetOf<String>()
     private val drawerOrder = mutableListOf<String>()
     private var favoritesInitialized = false
@@ -113,6 +117,10 @@ class MainActivity : Activity() {
         window.navigationBarColor = 0xff061a1d.toInt()
         columns = getPreferences(MODE_PRIVATE).getInt("columns", 4).coerceIn(4, 6)
         showWallpaper = getPreferences(MODE_PRIVATE).getBoolean("wallpaper", true)
+        iconSize = getPreferences(MODE_PRIVATE).getInt("icon_size", 48).coerceIn(36, 64)
+        heartSize = getPreferences(MODE_PRIVATE).getInt("heart_size", 112).coerceIn(72, 168)
+        heartOpacity = getPreferences(MODE_PRIVATE).getInt("heart_opacity", 100).coerceIn(20, 100)
+        hiddenApps.addAll(getPreferences(MODE_PRIVATE).getString("hidden_apps", "")?.split("|")?.filter { it.isNotBlank() } ?: emptyList())
         drawerOrder.addAll(getPreferences(MODE_PRIVATE).getString("drawer_order", "")?.split("|")?.filter { it.isNotBlank() } ?: emptyList())
         loadSignaturePhoto()
         loadFolders()
@@ -184,7 +192,7 @@ class MainActivity : Activity() {
             val inWorkspace = gestureY >= location[1] && gestureY <= location[1] + content.height
             if (inWorkspace && kotlin.math.abs(dx) > dp(65) && kotlin.math.abs(dx) > kotlin.math.abs(dy) * 1.3f) {
                 if (drawer) {
-                    val matches = apps.count { it.name.contains(drawerQuery, true) }
+                    val matches = apps.count { it.pkg !in hiddenApps && it.name.contains(drawerQuery, true) }
                     val max = ((matches.coerceAtLeast(1) - 1) / (columns * 5))
                     if (dx < 0 && page < max) page++
                     else if (dx > 0 && page > 0) page--
@@ -370,7 +378,7 @@ class MainActivity : Activity() {
             contentDescription = "Buka ${app.name}"
         }
         cell.addView(ImageView(this).apply { setImageDrawable(app.icon) },
-            LinearLayout.LayoutParams(dp(48), dp(48)))
+            LinearLayout.LayoutParams(dp(iconSize), dp(iconSize)))
         val labelRow = FrameLayout(this)
         labelRow.addView(text(app.name, 11f).apply {
             maxLines = 2; ellipsize = android.text.TextUtils.TruncateAt.END
@@ -493,8 +501,8 @@ class MainActivity : Activity() {
             importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
         }
         if (signaturePhoto != null) {
-            group.addView(HeartPhoto(this).apply { isClickable = false },
-                LinearLayout.LayoutParams(dp(112), dp(106)))
+            group.addView(HeartPhoto(this).apply { isClickable = false; alpha = heartOpacity / 100f },
+                LinearLayout.LayoutParams(dp(heartSize), dp(heartSize)))
         }
         group.addView(text("IING SUTADI", 35f, aqua).apply {
             setTypeface(Typeface.create("cursive", Typeface.ITALIC))
@@ -502,7 +510,7 @@ class MainActivity : Activity() {
             isClickable = false
             isFocusable = false
         }, LinearLayout.LayoutParams(-1, dp(60)))
-        content.addView(group, FrameLayout.LayoutParams(-1, dp(176), Gravity.CENTER))
+        content.addView(group, FrameLayout.LayoutParams(-1, dp(heartSize + 70), Gravity.CENTER))
     }
     private fun saveFavorites() {
         favoritesInitialized = true
@@ -636,7 +644,7 @@ class MainActivity : Activity() {
         area.addView(scroll, LinearLayout.LayoutParams(-1, 0, 1f))
         fun redraw() {
             grid.removeAllViews()
-            val filtered = apps.filter { it.name.contains(search.text.toString(), true) }
+            val filtered = apps.filter { it.pkg !in hiddenApps && it.name.contains(search.text.toString(), true) }
             val perPage = columns * 5
             val max = ((filtered.size - 1).coerceAtLeast(0)) / perPage
             page = page.coerceIn(0, max)
