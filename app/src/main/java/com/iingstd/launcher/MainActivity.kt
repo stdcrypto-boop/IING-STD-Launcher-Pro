@@ -162,13 +162,9 @@ class MainActivity : Activity() {
         if (ev.actionMasked == MotionEvent.ACTION_UP && !panel) {
             val dx = ev.rawX - gestureX
             val dy = ev.rawY - gestureY
-            if (kotlin.math.abs(dx) > dp(90) && kotlin.math.abs(dx) > kotlin.math.abs(dy) * 1.4f) {
-                if (!drawer) {
-                    val maxPage = ((favorites.size.coerceAtLeast(1) - 1) / (columns * 4))
-                    page = (page + if (dx < 0) 1 else -1).coerceIn(0, maxPage)
-                } else {
-                    page = (page + if (dx < 0) 1 else -1).coerceAtLeast(0)
-                }
+            if (!drawer && kotlin.math.abs(dx) > dp(90) && kotlin.math.abs(dx) > kotlin.math.abs(dy) * 1.4f) {
+                val maxPage = ((favorites.size.coerceAtLeast(1) - 1) / (columns * 4))
+                page = (page + if (dx < 0) 1 else -1).coerceIn(0, maxPage)
                 render()
                 return true
             }
@@ -343,7 +339,7 @@ class MainActivity : Activity() {
     }
     private fun renderDrawer() {
         val area = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-        content.addView(area)
+        content.addView(area, FrameLayout.LayoutParams(-1, -1))
         val search = EditText(this).apply {
             hint = "Cari aplikasi"; setSingleLine(true); textSize = 16f
             setTextColor(Color.WHITE); setHintTextColor(muted)
@@ -360,7 +356,7 @@ class MainActivity : Activity() {
         pager.addView(layout, LinearLayout.LayoutParams(dp(45), dp(43)))
         area.addView(pager)
         val grid = GridLayout(this).apply { columnCount = columns }
-        val scroll = ScrollView(this).apply { addView(grid) }
+        val scroll = ScrollView(this).apply { addView(grid); isFillViewport = true }
         area.addView(scroll, LinearLayout.LayoutParams(-1, 0, 1f))
         fun redraw() {
             grid.removeAllViews()
@@ -396,7 +392,7 @@ class MainActivity : Activity() {
         val area = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         val scrollPanel = ScrollView(this)
         scrollPanel.addView(area)
-        content.addView(scrollPanel)
+        content.addView(scrollPanel, FrameLayout.LayoutParams(-1, -1))
         area.addView(text("PANEL TOSCA  •  KONTROL CEPAT", 16f, aqua), LinearLayout.LayoutParams(-1, dp(55)))
         val options = listOf("Wi-Fi" to Settings.ACTION_WIFI_SETTINGS,
             "Internet" to Settings.ACTION_WIRELESS_SETTINGS,
