@@ -2,6 +2,9 @@ package com.iingstd.launcher
 
 import android.app.Activity
 import android.app.AlertDialog
+import android.app.WallpaperManager
+import android.app.role.RoleManager
+import android.graphics.drawable.Drawable
 import android.content.*
 import android.graphics.Color
 import android.graphics.Canvas
@@ -46,6 +49,7 @@ class MainActivity : Activity() {
     private var startY = 0f
     private var gestureX = 0f
     private var gestureY = 0f
+    private var showWallpaper = true
     private val tick = object : Runnable {
         override fun run() {
             if (::clock.isInitialized) {
@@ -89,8 +93,10 @@ class MainActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         window.statusBarColor = 0xff061a1d.toInt()
+        window.decorView.systemUiVisibility = 0
         window.navigationBarColor = 0xff061a1d.toInt()
         columns = getPreferences(MODE_PRIVATE).getInt("columns", 4).coerceIn(4, 6)
+        showWallpaper = getPreferences(MODE_PRIVATE).getBoolean("wallpaper", true)
         root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(16), dp(8), dp(16), dp(12))
@@ -98,6 +104,7 @@ class MainActivity : Activity() {
                 intArrayOf(0xff061719.toInt(), 0xff104441.toInt(), 0xff082126.toInt()))
         }
         setContentView(root)
+        applyWallpaper()
         val brand = text("IING STD  /  LAUNCHER PRO", 13f, aqua).apply {
             gravity = Gravity.START or Gravity.CENTER_VERTICAL
             setTypeface(null, Typeface.BOLD)
@@ -167,6 +174,38 @@ class MainActivity : Activity() {
             }
         }
         return super.dispatchTouchEvent(ev)
+    }
+    private fun applyWallpaper() {
+        if (showWallpaper) {
+            try {
+                window.setBackgroundDrawableResource(android.R.color.transparent)
+                window.addFlags(WindowManager.LayoutParams.FLAG_SHOW_WALLPAPER)
+                root.background = GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
+                    intArrayOf(0x99051719.toInt(), 0x770b2527.toInt(), 0xbb061719.toInt()))
+            } catch (_: Exception) {
+                root.setBackgroundColor(0xff061719.toInt())
+            }
+        } else {
+            window.clearFlags(WindowManager.LayoutParams.FLAG_SHOW_WALLPAPER)
+            root.background = GradientDrawable(GradientDrawable.Orientation.TL_BR,
+                intArrayOf(0xff061719.toInt(), 0xff104441.toInt(), 0xff082126.toInt()))
+        }
+    }
+    private fun requestDefaultHome() {
+        if (Build.VERSION.SDK_INT >= 29) {
+            val roles = getSystemService(RoleManager::class.java)
+            if (roles != null && roles.isRoleAvailable(RoleManager.ROLE_HOME) &&
+                !roles.isRoleHeld(RoleManager.ROLE_HOME)) {
+                try { startActivityForResult(roles.createRequestRoleIntent(RoleManager.ROLE_HOME), 100) }
+                catch (_: Exception) { openHomeSettings() }
+                return
+            }
+        }
+        openHomeSettings()
+    }
+    private fun openHomeSettings() {
+        try { startActivity(Intent(Settings.ACTION_HOME_SETTINGS)) }
+        catch (_: Exception) { Toast.makeText(this, "Pilih IING STD sebagai aplikasi Home di Pengaturan", Toast.LENGTH_LONG).show() }
     }
     private fun loadApps() {
         apps.clear()
@@ -345,6 +384,20 @@ class MainActivity : Activity() {
             setOnClickListener { columns = if (columns == 4) 5 else if (columns == 5) 6 else 4; getPreferences(MODE_PRIVATE).edit().putInt("columns", columns).apply(); page = 0; render() }
         }
         area.addView(layoutSetting, LinearLayout.LayoutParams(-1, dp(65)).apply { topMargin = dp(10) })
+        val wallpaperSetting = text("WALLPAPER HP  •  " + if (showWallpaper) "AKTIF" else "NONAKTIF", 15f, aqua).apply {
+            background = shape(0xff124441.toInt(), 18, true)
+            setOnClickListener {
+                showWallpaper = !showWallpaper
+                getPreferences(MODE_PRIVATE).edit().putBoolean("wallpaper", showWallpaper).apply()
+                applyWallpaper(); render()
+            }
+        }
+        area.addView(wallpaperSetting, LinearLayout.LayoutParams(-1, dp(65)).apply { topMargin = dp(10) })
+        val defaultSetting = text("JADIKAN LAUNCHER UTAMA  ⌂", 15f, aqua).apply {
+            background = shape(0xff124441.toInt(), 18, true)
+            setOnClickListener { requestDefaultHome() }
+        }
+        area.addView(defaultSetting, LinearLayout.LayoutParams(-1, dp(65)).apply { topMargin = dp(10) })
         area.addView(text("Panel ini membuka pengaturan Android; tidak mengganti Quick Settings sistem.", 12f, muted),
             LinearLayout.LayoutParams(-1, dp(70)))
     }
