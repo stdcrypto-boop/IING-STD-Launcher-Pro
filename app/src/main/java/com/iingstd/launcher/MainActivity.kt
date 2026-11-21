@@ -293,6 +293,21 @@ class MainActivity : Activity() {
         }
     }
     private fun renderHome() {
+        // Decorative signature is drawn behind the workspace and never consumes touches.
+        val signature = TextView(this).apply {
+            text = "IING SUTADI"
+            textSize = 38f
+            setTextColor(aqua)
+            setTypeface(Typeface.create("cursive", Typeface.ITALIC))
+            gravity = Gravity.CENTER
+            alpha = 0.35f
+            isClickable = false
+            isLongClickable = false
+            isFocusable = false
+            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+            setOnTouchListener { _, _ -> false }
+        }
+        content.addView(signature, FrameLayout.LayoutParams(-1, dp(100), Gravity.CENTER))
         val area = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         content.addView(area, FrameLayout.LayoutParams(-1, -1))
         val heading = text("BERANDA  •  IING STD", 13f, aqua).apply {
