@@ -81,7 +81,8 @@ class DecorationActivity : Activity() {
         val size = w * .39f
         val x = (w-size)/2f
         val y = h*.43f-size*.5f
-        run {\n            val bmp = photo
+        run {
+            val bmp = photo
             val heart = Path().apply {
                 moveTo(x+size*.5f, y+size*.93f)
                 cubicTo(x-size*.12f, y+size*.47f, x+size*.05f, y+size*.05f, x+size*.28f, y+size*.08f)
@@ -90,11 +91,19 @@ class DecorationActivity : Activity() {
                 cubicTo(x+size*1.16f, y+size*.53f, x+size*.72f, y+size*.83f, x+size*.5f, y+size*.93f)
                 close()
             }
-            canvas.save(); canvas.clipPath(heart)
-            val scale = maxOf(size/bmp.width, size/bmp.height)
-            val dw = bmp.width*scale; val dh = bmp.height*scale
-            canvas.drawBitmap(bmp, null, RectF(x+(size-dw)/2, y+(size-dh)/2, x+(size+dw)/2, y+(size+dh)/2), p)
-            canvas.restore()
+            if (bmp != null) {
+                canvas.save()
+                canvas.clipPath(heart)
+                val scale = maxOf(size / bmp.width, size / bmp.height)
+                val dw = bmp.width * scale
+                val dh = bmp.height * scale
+                canvas.drawBitmap(bmp, null,
+                    RectF(x + (size-dw)/2, y + (size-dh)/2, x + (size+dw)/2, y + (size+dh)/2), p)
+                canvas.restore()
+            } else {
+                p.color = 0xfff062a6.toInt()
+                canvas.drawPath(heart, p)
+            }
             p.style = Paint.Style.STROKE; p.strokeWidth = w*.012f; p.color = 0xffff80c0.toInt()
             canvas.drawPath(heart,p); p.style = Paint.Style.FILL
         }
