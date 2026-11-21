@@ -122,6 +122,7 @@ class MainActivity : Activity() {
     private val drawerOrder = mutableListOf<String>()
     private val dockApps = mutableListOf<String>()
     private var dockCapacity = 4
+    private var dockIconSize = 54
     private var favoritesInitialized = false
     private val folders = linkedMapOf<String, MutableList<String>>()
     private val folderNames = linkedMapOf<String, String>()
@@ -170,6 +171,44 @@ class MainActivity : Activity() {
         setColor(color); cornerRadius = dp(radius).toFloat()
         if (outline) setStroke(dp(1), aqua)
     }
+    // Small symmetric front-facing rooster illustration, independent of emoji fonts.
+    private inner class FrontRooster(context: Context) : View(context) {
+        private val brush = Paint(Paint.ANTI_ALIAS_FLAG)
+        override fun onDraw(canvas: Canvas) {
+            super.onDraw(canvas)
+            val unit = minOf(width / 40f, height / 58f)
+            canvas.save()
+            canvas.translate(width / 2f, height / 2f)
+            canvas.scale(unit, unit)
+            fun oval(color: Int, left: Float, top: Float, right: Float, bottom: Float) {
+                brush.color = color
+                canvas.drawOval(left, top, right, bottom, brush)
+            }
+            val gold = 0xffd4af37.toInt()
+            val cream = 0xffffe3a0.toInt()
+            val red = 0xffe35d4f.toInt()
+            oval(gold, -14f, 1f, 14f, 24f) // chest
+            oval(cream, -12f, -19f, 12f, 7f) // front-facing head
+            oval(red, -4f, -27f, 4f, -17f)
+            oval(red, -11f, -23f, -3f, -15f)
+            oval(red, 3f, -23f, 11f, -15f)
+            oval(0xff27221e.toInt(), -7f, -9f, -4f, -6f)
+            oval(0xff27221e.toInt(), 4f, -9f, 7f, -6f)
+            val beak = Path().apply {
+                moveTo(0f, -5f); lineTo(-5f, 1f); lineTo(5f, 1f); close()
+            }
+            brush.color = 0xffffa640.toInt()
+            canvas.drawPath(beak, brush)
+            oval(red, -3f, 1f, 3f, 10f)
+            oval(cream, -17f, 7f, -10f, 20f)
+            oval(cream, 10f, 7f, 17f, 20f)
+            brush.color = gold
+            brush.strokeWidth = 2.5f
+            canvas.drawLine(-7f, 22f, -7f, 27f, brush)
+            canvas.drawLine(7f, 22f, 7f, 27f, brush)
+            canvas.restore()
+        }
+    }
     private inner class SignalBars(context: Context) : View(context) {
         private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
         override fun onDraw(canvas: Canvas) {
@@ -203,6 +242,7 @@ class MainActivity : Activity() {
         drawerOrder.addAll(getPreferences(MODE_PRIVATE).getString("drawer_order", "")?.split("|")?.filter { it.isNotBlank() } ?: emptyList())
         dockApps.addAll(getPreferences(MODE_PRIVATE).getString("dock_apps", "")?.split("|")?.filter { it.isNotBlank() } ?: emptyList())
         dockCapacity = getPreferences(MODE_PRIVATE).getInt("dock_capacity", 4).coerceIn(4, 6)
+        dockIconSize = getPreferences(MODE_PRIVATE).getInt("dock_icon_size", 54).coerceIn(42, 62)
         loadSignaturePhoto()
         loadFolders()
         favoritesInitialized = getPreferences(MODE_PRIVATE).contains("favorites_order")
@@ -231,7 +271,7 @@ class MainActivity : Activity() {
         status.addView(battery)
         root.addView(status)
         val clockRow = LinearLayout(this).apply { gravity = Gravity.CENTER; orientation = LinearLayout.HORIZONTAL }
-        val roosterLeft = text("🐓", 19f).apply { contentDescription = "Ayam menghadap depan kiri" }
+        val roosterLeft = FrontRooster(this).apply { contentDescription = "Ayam menghadap depan kiri" }
         clockRow.addView(roosterLeft, LinearLayout.LayoutParams(dp(38), dp(64)))
         clock = text("", 35f).apply {
             setTypeface(null, Typeface.BOLD)
@@ -243,7 +283,7 @@ class MainActivity : Activity() {
             setPadding(dp(12), 0, dp(12), 0)
         }
         clockRow.addView(clock, LinearLayout.LayoutParams(-2, dp(61)))
-        val roosterRight = text("🐓", 19f).apply { contentDescription = "Ayam menghadap depan kanan" }
+        val roosterRight = FrontRooster(this).apply { contentDescription = "Ayam menghadap depan kanan" }
         clockRow.addView(roosterRight, LinearLayout.LayoutParams(dp(38), dp(64)))
         root.addView(clockRow, LinearLayout.LayoutParams(-1, dp(70)))
         date = text("", 13f, muted)
@@ -791,12 +831,12 @@ class MainActivity : Activity() {
             }
             image.background = GradientDrawable().apply {
                 setColor(0x16D4AF37)
-                cornerRadius = dp(31).toFloat()
+                cornerRadius = dp(dockIconSize / 2).toFloat()
                 setStroke(dp(1), 0xA0D4AF37.toInt())
             }
-            image.setPadding(dp(10), dp(10), dp(10), dp(10))
+            image.setPadding(dp(8), dp(8), dp(8), dp(8))
             val slot = FrameLayout(this)
-            slot.addView(image, FrameLayout.LayoutParams(dp(58), dp(58), Gravity.CENTER))
+            slot.addView(image, FrameLayout.LayoutParams(dp(dockIconSize), dp(dockIconSize), Gravity.CENTER))
             dock.addView(slot, LinearLayout.LayoutParams(0, dp(64), 1f))
         }
         repeat((dockCapacity - dockApps.size).coerceAtLeast(0)) {
@@ -954,6 +994,16 @@ class MainActivity : Activity() {
             }
         }
         area.addView(dockSetting, LinearLayout.LayoutParams(-1, dp(60)))
+        val dockSizeSetting = text("UKURAN IKON DOCK  •  ${dockIconSize}dp", 15f, aqua).apply {
+            background = shape(0xff124441.toInt(), 18, true)
+            setOnClickListener {
+                dockIconSize = if (dockIconSize >= 62) 42 else dockIconSize + 4
+                getPreferences(MODE_PRIVATE).edit().putInt("dock_icon_size", dockIconSize).apply()
+                buildDock(dockBar)
+                render()
+            }
+        }
+        area.addView(dockSizeSetting, LinearLayout.LayoutParams(-1, dp(58)))
         val signatureSetting = text("TANDA TANGAN  •  " + if (showSignature) "TAMPIL" else "SEMBUNYI", 15f, aqua).apply {
             background = shape(0xff124441.toInt(), 18, true)
             setOnClickListener {
@@ -1073,6 +1123,7 @@ class MainActivity : Activity() {
             put("wallpaper", showWallpaper)
             put("two_finger_panel", twoFingerPanel)
             put("dock_capacity", dockCapacity)
+            put("dock_icon_size", dockIconSize)
         }
     }
     private fun exportLayout() {
@@ -1104,10 +1155,12 @@ class MainActivity : Activity() {
         showWallpaper = data.optBoolean("wallpaper", true)
         twoFingerPanel = data.optBoolean("two_finger_panel", true)
         dockCapacity = data.optInt("dock_capacity", 4).coerceIn(4, 6)
+        dockIconSize = data.optInt("dock_icon_size", 54).coerceIn(42, 62)
         prefs.putInt("columns", columns).putInt("icon_size", iconSize)
             .putInt("heart_size", heartSize).putInt("heart_opacity", heartOpacity)
             .putInt("heart_offset_x", heartOffsetX).putInt("heart_offset_y", heartOffsetY).putBoolean("show_signature", showSignature)
-            .putBoolean("wallpaper", showWallpaper).putBoolean("two_finger_panel", twoFingerPanel).apply()
+            .putBoolean("wallpaper", showWallpaper).putBoolean("two_finger_panel", twoFingerPanel)
+            .putInt("dock_capacity", dockCapacity).putInt("dock_icon_size", dockIconSize).apply()
         favorites.clear()
         data.optString("favorites_order").split("|").filter { it.isNotBlank() }.forEach { favorites.add(it) }
         favoritesInitialized = true
