@@ -56,6 +56,7 @@ class MainActivity : Activity() {
     private var gestureY = 0f
     private var showWallpaper = true
     private val favorites = linkedSetOf<String>()
+    private val drawerOrder = mutableListOf<String>()
     private var favoritesInitialized = false
     private val folders = linkedMapOf<String, MutableList<String>>()
     private val folderNames = linkedMapOf<String, String>()
@@ -107,6 +108,7 @@ class MainActivity : Activity() {
         window.navigationBarColor = 0xff061a1d.toInt()
         columns = getPreferences(MODE_PRIVATE).getInt("columns", 4).coerceIn(4, 6)
         showWallpaper = getPreferences(MODE_PRIVATE).getBoolean("wallpaper", true)
+        drawerOrder.addAll(getPreferences(MODE_PRIVATE).getString("drawer_order", "")?.split("|")?.filter { it.isNotBlank() } ?: emptyList())
         loadFolders()
         favoritesInitialized = getPreferences(MODE_PRIVATE).contains("favorites_order")
         getPreferences(MODE_PRIVATE).getString("favorites_order", "")?.split("|")?.filter { it.isNotBlank() }?.forEach { favorites.add(it) }
@@ -241,7 +243,7 @@ class MainActivity : Activity() {
                 .setClassName(pkg, info.activityInfo.name).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             apps.add(App(info.loadLabel(packageManager).toString(), pkg, launch, info.loadIcon(packageManager)))
         }
-        apps.sortBy { it.name.lowercase(Locale.getDefault()) }
+        apps.sortWith(compareBy<App> { val pos = drawerOrder.indexOf(it.pkg); if (pos < 0) Int.MAX_VALUE else pos }.thenBy { it.name.lowercase(Locale.getDefault()) })
         if (!favoritesInitialized) {
             apps.filter { app -> listOf("camera", "chrome", "whatsapp", "setting", "phone", "message").any { app.name.contains(it, true) || app.pkg.contains(it, true) } }
                 .take(8).forEach { favorites.add(it.pkg) }
@@ -368,13 +370,13 @@ class MainActivity : Activity() {
         }, LinearLayout.LayoutParams(-1, dp(39)).apply { topMargin = dp(5) })
         cell.setOnClickListener { try { startActivity(app.launch) } catch (_: Exception) { Toast.makeText(this, "Tidak dapat membuka ${app.name}", Toast.LENGTH_SHORT).show() } }
         cell.setOnLongClickListener {
-            if (!drawer && !panel) {
+            if (!panel) {
                 val data = ClipData.newPlainText("launcher-app", app.pkg)
                 cell.startDragAndDrop(data, View.DragShadowBuilder(cell), app.pkg, 0)
                 true
             } else { appMenu(app); true }
         }
-        if (!drawer && !panel) cell.setOnDragListener { _, event ->
+        if (!panel) cell.setOnDragListener { _, event ->
             when (event.action) {
                 DragEvent.ACTION_DRAG_STARTED -> event.clipDescription?.hasMimeType("text/plain") == true
                 DragEvent.ACTION_DRAG_ENTERED -> { cell.alpha = 0.5f; true }
@@ -382,8 +384,9 @@ class MainActivity : Activity() {
                 DragEvent.ACTION_DROP -> {
                     cell.alpha = 1f
                     val source = event.localState as? String
-                    if (source != null && source != app.pkg && favorites.contains(source)) {
-                        moveIntoFolder(source, app.pkg)
+                    if (source != null && source != app.pkg) {
+                        if (drawer) reorderDrawer(source, app.pkg)
+                        else if (favorites.contains(source)) moveIntoFolder(source, app.pkg)
                     }
                     true
                 }
@@ -392,6 +395,32 @@ class MainActivity : Activity() {
         }
         cell.layoutParams = GridLayout.LayoutParams().apply { this.width = width; this.height = height }
         return cell
+    }
+    private fun reorderDrawer(source: String, target: String) {
+        val order = apps.map { it.pkg }.toMutableList()
+        if (!order.remove(source)) return
+        val index = order.indexOf(target)
+        if (index < 0) return
+        order.add(index, source)
+        drawerOrder.clear(); drawerOrder.addAll(order)
+        getPreferences(MODE_PRIVATE).edit().putString("drawer_order", drawerOrder.joinToString("|")).apply()
+        apps.sortBy { drawerOrder.indexOf(it.pkg).let { pos -> if (pos < 0) Int.MAX_VALUE else pos } }
+        render()
+    }
+    private fun addSignatureWatermark() {
+        val signature = TextView(this).apply {
+            text = "IING SUTADI"
+            textSize = 38f
+            setTextColor(aqua)
+            setTypeface(Typeface.create("cursive", Typeface.ITALIC))
+            gravity = Gravity.CENTER
+            alpha = 0.30f
+            isClickable = false
+            isLongClickable = false
+            isFocusable = false
+            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+        }
+        content.addView(signature, FrameLayout.LayoutParams(-1, dp(100), Gravity.CENTER))
     }
     private fun saveFavorites() {
         favoritesInitialized = true
@@ -438,21 +467,7 @@ class MainActivity : Activity() {
         }
     }
     private fun renderHome() {
-        // Decorative signature is drawn behind the workspace and never consumes touches.
-        val signature = TextView(this).apply {
-            text = "IING SUTADI"
-            textSize = 38f
-            setTextColor(aqua)
-            setTypeface(Typeface.create("cursive", Typeface.ITALIC))
-            gravity = Gravity.CENTER
-            alpha = 0.35f
-            isClickable = false
-            isLongClickable = false
-            isFocusable = false
-            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
-            setOnTouchListener { _, _ -> false }
-        }
-        content.addView(signature, FrameLayout.LayoutParams(-1, dp(100), Gravity.CENTER))
+        addSignatureWatermark()
         val area = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         content.addView(area, FrameLayout.LayoutParams(-1, -1))
         val heading = text("BERANDA  •  IING STD", 13f, aqua).apply {
@@ -488,6 +503,7 @@ class MainActivity : Activity() {
         area.addView(hint, LinearLayout.LayoutParams(-1, dp(35)))
     }
     private fun renderDrawer() {
+        addSignatureWatermark()
         val area = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         content.addView(area, FrameLayout.LayoutParams(-1, -1))
         val search = EditText(this).apply {
@@ -620,6 +636,7 @@ class MainActivity : Activity() {
             dbm >= -90 -> 2
             else -> 1
         }
+        signalBars.alpha = if (dbm == Int.MIN_VALUE) 0.28f else 1f
         signalBars.contentDescription = if (dbm == Int.MIN_VALUE) "Kekuatan sinyal tidak tersedia" else "Kekuatan sinyal $signalLevel dari 4"
         signalBars.invalidate()
         val now = SystemClock.elapsedRealtime()
